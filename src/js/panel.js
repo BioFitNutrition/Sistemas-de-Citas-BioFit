@@ -9,11 +9,16 @@ import { supabase } from "./supabaseClient.js";
 import { getPerfil, esAdmin, esTrabajador, miSede } from "./auth.js";
 import {
   showView, showToast, formatearFecha, formatearHora, hoyISO, escapeHtml, setLoading,
+  hhmm12, toMin,
 } from "./utils.js";
-import { llenarSelectSedes, chipSede, nombreSede } from "./sedes.js";
+import { crearCalendarioMes, serieDeHoras } from "./calendario.js";
+import { llenarSelectSedes, chipSede, nombreSede, colorSede } from "./sedes.js";
+import { DURACION_CITA_MIN } from "./config.js";
 
 let realtimeChannel = null;
 let trabajadores = [];   // cache para los selects de delegación (solo admin)
+let altaCal = null;      // calendario de alta de horarios (modo "varios")
+let seleccionHorarios = new Set();   // ids marcados para borrar en lote (admin)
 
 // Sede a la que el usuario está amarrado, o null si puede elegir entre todas.
 // El admin siempre puede. El trabajador solo si su perfil tiene sede_id NULL,
@@ -29,9 +34,11 @@ export function initPanel() {
     btn.addEventListener("click", () => cambiarTab(btn.dataset.tab));
   });
 
-  document.getElementById("form-nuevo-horario").addEventListener("submit", onAgregarHorario);
   document.getElementById("filtro-sede-citas").addEventListener("change", cargarCitas);
   document.getElementById("filtro-sede-horarios").addEventListener("change", cargarHorarios);
+
+  initAltaHorarios();
+  initBorradoEnLote();
 }
 
 // Entra al panel y lo configura según el rol.
@@ -83,6 +90,10 @@ export async function entrarAlPanel() {
   document.querySelectorAll("#tab-horarios .filter-row__sede").forEach((el) => {
     el.classList.toggle("hidden", Boolean(miSedeFija));
   });
+
+  // El calendario de alta toma el color de la sede activa (la elegida por el
+  // admin, o la fija del trabajador).
+  alCambiarSedeAlta();
 
   if (esAdmin()) await cargarTrabajadores();
 
@@ -292,41 +303,278 @@ async function cancelarCita(id) {
   cargarHorarios();
 }
 
-// ---------- HORARIOS ----------
+// ---------- ALTA DE HORARIOS (en lote) ----------
+// Antes era un formulario de tres campos sueltos: una fila por horario. Cargar
+// la agenda de una semana eran decenas de envios. Ahora se marcan varios dias
+// en el calendario, se define una franja y se generan de una vez todas las
+// citas de 20 minutos que entren.
 
-async function onAgregarHorario(e) {
-  e.preventDefault();
-  const form = e.target;
-  const errorEl = document.getElementById("horario-error");
-  errorEl.classList.add("hidden");
+const MINUTOS_OPCIONES = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 
-  const fd = new FormData(form);
-  // Al trabajador con sede fija se le impone la suya. El admin y el trabajador
-  // que cubre ambas eligen en el formulario.
-  const sede = sedeFija() ?? fd.get("sede");
+function initAltaHorarios() {
+  const host = document.getElementById("alta-cal-host");
+  if (!host) return;
 
-  const submitBtn = form.querySelector('button[type="submit"]');
-  setLoading(submitBtn, true, "Agregando...");
-
-  const { error } = await supabase.from("horarios_disponibles").insert({
-    sede_id: sede,
-    fecha: fd.get("fecha"),
-    hora: fd.get("hora"),
+  // El mismo componente que ve el socio, en modo "varios". `minimo: hoyISO()`
+  // es lo que impide elegir fechas pasadas: no hace falta validarlo aparte.
+  altaCal = crearCalendarioMes(host, {
+    modo: "varios",
+    minimo: hoyISO(),
+    onSeleccion: actualizarResumenAlta,
   });
 
-  setLoading(submitBtn, false);
+  llenarSelectHoras(document.getElementById("alta-desde-h"), document.getElementById("alta-desde-m"));
+  llenarSelectHoras(document.getElementById("alta-hasta-h"), document.getElementById("alta-hasta-m"));
 
-  if (error) {
-    errorEl.textContent = error.code === "23505"
-      ? "Ese horario ya existe para esta sede."
-      : "No se pudo agregar el horario.";
-    errorEl.classList.remove("hidden");
-    console.error(error);
+  // Franja por defecto: 5:00 pm a 7:00 pm.
+  fijarHora("desde", 17, 0);
+  fijarHora("hasta", 19, 0);
+
+  document.querySelectorAll("#tab-horarios .hora-sel select").forEach((sel) => {
+    sel.addEventListener("change", actualizarResumenAlta);
+  });
+  document.getElementById("nuevo-horario-sede").addEventListener("change", alCambiarSedeAlta);
+  document.getElementById("btn-crear-horarios").addEventListener("click", onCrearHorarios);
+
+  actualizarResumenAlta();
+}
+
+function llenarSelectHoras(selHora, selMin) {
+  for (let h = 1; h <= 12; h++) {
+    const o = document.createElement("option");
+    o.value = String(h);
+    o.textContent = String(h);
+    selHora.appendChild(o);
+  }
+  MINUTOS_OPCIONES.forEach((m) => {
+    const o = document.createElement("option");
+    o.value = String(m);
+    o.textContent = String(m).padStart(2, "0");
+    selMin.appendChild(o);
+  });
+}
+
+function fijarHora(cual, hora24, minutos) {
+  const h12 = hora24 % 12 === 0 ? 12 : hora24 % 12;
+  document.getElementById("alta-" + cual + "-h").value = String(h12);
+  document.getElementById("alta-" + cual + "-m").value = String(minutos);
+  document.getElementById("alta-" + cual + "-ampm").value = hora24 >= 12 ? "PM" : "AM";
+}
+
+// Lee los tres selectores de una franja y devuelve minutos desde medianoche.
+function leerHora(cual) {
+  const h12 = Number(document.getElementById("alta-" + cual + "-h").value);
+  const min = Number(document.getElementById("alta-" + cual + "-m").value);
+  const pm = document.getElementById("alta-" + cual + "-ampm").value === "PM";
+
+  let h24 = h12 % 12;            // 12am -> 0, 12pm -> 12
+  if (pm) h24 += 12;
+  return h24 * 60 + min;
+}
+
+function sedeDelAlta() {
+  return sedeFija() ?? document.getElementById("nuevo-horario-sede").value;
+}
+
+function alCambiarSedeAlta() {
+  if (altaCal) altaCal.setColor(colorSede(sedeDelAlta()));
+  actualizarResumenAlta();
+}
+
+function plural(n, singular, pluralTxt) {
+  return n + " " + (n === 1 ? singular : pluralTxt);
+}
+
+// Recalcula el aviso "Vas a crear N horarios en M dias" con cada cambio, y
+// habilita el boton solo cuando hay algo valido que crear.
+function actualizarResumenAlta() {
+  const resumenEl = document.getElementById("alta-resumen");
+  const btn = document.getElementById("btn-crear-horarios");
+  if (!resumenEl || !btn) return;
+
+  const dias = altaCal ? altaCal.seleccion() : [];
+  const desde = leerHora("desde");
+  const hasta = leerHora("hasta");
+  const horas = serieDeHoras(desde, hasta, DURACION_CITA_MIN);
+
+  let aviso = "";
+  if (!sedeDelAlta()) aviso = "Elige la sede donde crear los horarios.";
+  else if (dias.length === 0) aviso = "Marca al menos un día en el calendario.";
+  else if (hasta <= desde) aviso = "La hora de fin tiene que ser posterior a la de inicio.";
+  else if (horas.length === 0) aviso = "La franja es más corta que una cita de " + DURACION_CITA_MIN + " minutos.";
+
+  resumenEl.classList.toggle("alta__resumen--aviso", Boolean(aviso));
+  btn.disabled = Boolean(aviso);
+
+  if (aviso) {
+    resumenEl.textContent = aviso;
     return;
   }
 
-  form.reset();
-  showToast("Horario agregado.");
+  const total = dias.length * horas.length;
+  const primera = hhmm12(toMin(horas[0]), true);
+  const ultima = hhmm12(toMin(horas[horas.length - 1]) + DURACION_CITA_MIN, true);
+  resumenEl.textContent =
+    "Vas a crear " + plural(total, "horario", "horarios") +
+    " en " + plural(dias.length, "día", "días") +
+    " — de " + primera + " a " + ultima + ".";
+}
+
+// Cuenta cuántos de los horarios que se van a crear ya están en la base.
+// Se consulta solo por las fechas elegidas, así que son pocas filas.
+async function contarExistentes(sede, dias, horas) {
+  const { data, error } = await supabase
+    .from("horarios_disponibles")
+    .select("fecha, hora")
+    .eq("sede_id", sede)
+    .in("fecha", dias);
+
+  if (error) {
+    console.error("No se pudo revisar qué horarios ya existían:", error);
+    return 0;
+  }
+
+  const buscadas = new Set(horas);
+  return (data || []).filter((h) => buscadas.has(String(h.hora).slice(0, 5))).length;
+}
+
+async function onCrearHorarios() {
+  const errorEl = document.getElementById("horario-error");
+  errorEl.classList.add("hidden");
+
+  const dias = altaCal.seleccion();
+  const horas = serieDeHoras(leerHora("desde"), leerHora("hasta"), DURACION_CITA_MIN);
+  const sede = sedeDelAlta();
+  if (dias.length === 0 || horas.length === 0 || !sede) return;
+
+  const total = dias.length * horas.length;
+  const confirmar = window.confirm(
+    "Vas a crear " + plural(total, "horario", "horarios") +
+    " en " + plural(dias.length, "día", "días") +
+    " en " + nombreSede(sede) + ".\n\n¿Continuar?"
+  );
+  if (!confirmar) return;
+
+  const filas = [];
+  dias.forEach((fecha) => horas.forEach((hora) => filas.push({ sede_id: sede, fecha, hora })));
+
+  const btn = document.getElementById("btn-crear-horarios");
+  setLoading(btn, true, "Creando...");
+
+  // Cuántos de los que se van a mandar YA existían. Se mide antes de insertar,
+  // contra la base, en vez de deducirlo de lo que devuelva el driver: así el
+  // recuento final es exacto pase lo que pase con la representación devuelta.
+  const repetidos = await contarExistentes(sede, dias, horas);
+
+  let error = null;
+
+  // Se manda por tandas para no armar una sola petición enorme.
+  for (let i = 0; i < filas.length && !error; i += 400) {
+    const tanda = filas.slice(i, i + 400);
+
+    // `ignoreDuplicates: true` se traduce en INSERT ... ON CONFLICT DO NOTHING:
+    // los que ya existen se saltan en silencio y el resto se crea igual, en vez
+    // de abortar toda la carga por chocar con unique(sede_id, fecha, hora).
+    //
+    // OJO: NO cambiar esto por un upsert normal. Pisaría la fila existente y
+    // podría volver a marcar como disponible un horario ya reservado o
+    // deshabilitado a mano, que es exactamente como se genera una doble reserva.
+    const { error: err } = await supabase
+      .from("horarios_disponibles")
+      .upsert(tanda, { onConflict: "sede_id,fecha,hora", ignoreDuplicates: true });
+
+    if (err) error = err;
+  }
+
+  setLoading(btn, false);
+
+  if (error) {
+    errorEl.textContent = "No se pudieron crear los horarios. Revisa tu conexión e intenta de nuevo.";
+    errorEl.classList.remove("hidden");
+    console.error(error);
+    cargarHorarios();
+    return;
+  }
+
+  const creados = Math.max(0, total - repetidos);
+  showToast(
+    repetidos > 0
+      ? plural(creados, "creado", "creados") + ", " + plural(repetidos, "ya existía", "ya existían") + "."
+      : plural(creados, "horario creado", "horarios creados") + "."
+  );
+
+  altaCal.limpiar();
+  cargarHorarios();
+}
+
+// ---------- BORRADO EN LOTE (solo admin) ----------
+// RLS solo deja borrar horarios al admin, asi que al trabajador no se le
+// muestran ni las casillas ni el boton (la barra lleva data-solo-admin).
+
+function initBorradoEnLote() {
+  const todos = document.getElementById("chk-todos-horarios");
+  const btn = document.getElementById("btn-borrar-horarios");
+  if (!todos || !btn) return;
+
+  todos.addEventListener("change", () => {
+    // "Todos los visibles" son los que la lista muestra ahora, que ya respetan
+    // el filtro de sede activo. Los bloqueados por una cita no se tocan.
+    document.querySelectorAll("#horarios-list .chk-horario:not(:disabled)").forEach((chk) => {
+      chk.checked = todos.checked;
+      if (todos.checked) seleccionHorarios.add(chk.dataset.id);
+      else seleccionHorarios.delete(chk.dataset.id);
+    });
+    actualizarBarraLote();
+  });
+
+  btn.addEventListener("click", onBorrarSeleccionados);
+}
+
+function actualizarBarraLote() {
+  const btn = document.getElementById("btn-borrar-horarios");
+  const todos = document.getElementById("chk-todos-horarios");
+  if (!btn) return;
+
+  const n = seleccionHorarios.size;
+  btn.disabled = n === 0;
+  btn.textContent = n === 0 ? "Eliminar" : "Eliminar " + plural(n, "horario", "horarios");
+
+  // La casilla de arriba refleja el estado real de la lista.
+  const libres = document.querySelectorAll("#horarios-list .chk-horario:not(:disabled)").length;
+  if (todos) todos.checked = libres > 0 && n === libres;
+}
+
+async function onBorrarSeleccionados() {
+  const ids = [...seleccionHorarios];
+  if (ids.length === 0) return;
+
+  const confirmar = window.confirm(
+    "¿Eliminar " + plural(ids.length, "horario", "horarios") + "?\n\nEsta acción no se puede deshacer."
+  );
+  if (!confirmar) return;
+
+  const btn = document.getElementById("btn-borrar-horarios");
+  setLoading(btn, true, "Eliminando...");
+
+  const { error } = await supabase.from("horarios_disponibles").delete().in("id", ids);
+
+  setLoading(btn, false);
+
+  if (error) {
+    // 23503 = hay una cita apuntando al horario. No deberia llegarse aca porque
+    // esas casillas van deshabilitadas, pero pudo reservarse recien.
+    showToast(
+      error.code === "23503"
+        ? "Alguno tiene una cita asociada y no se puede eliminar. Cancela la cita primero."
+        : "No se pudieron eliminar los horarios.",
+      "error"
+    );
+    console.error(error);
+    cargarHorarios();
+    return;
+  }
+
+  showToast(plural(ids.length, "horario eliminado", "horarios eliminados") + ".");
   cargarHorarios();
 }
 
@@ -359,7 +607,8 @@ export async function cargarHorarios() {
   }
 
   if (!horarios || horarios.length === 0) {
-    listEl.innerHTML = '<p class="empty-state">No hay horarios registrados. Agrega uno arriba.</p>';
+    listEl.innerHTML = '<p class="empty-state">No hay horarios registrados. Crea los primeros con el calendario de arriba.</p>';
+    apagarBarraLote();
     return;
   }
 
@@ -367,22 +616,78 @@ export async function cargarHorarios() {
   // Con RLS, un trabajador solo recibe SUS citas: si cruzáramos, los horarios tomados
   // por citas de otros le aparecerían libres y podría generarse una doble reserva.
   // Solo el admin (que ve todas las citas) puede distinguir "ocupado" de "deshabilitado".
+  //
+  // El admin necesita además saber qué horarios tiene ALGUNA cita apuntándolos,
+  // incluso cancelada: `citas.horario_id` es una FK sin ON DELETE, así que
+  // Postgres rechaza borrar el horario mientras esa fila exista. Ojo con el caso
+  // traicionero: una cita cancelada libera el horario (vuelve a "Libre") pero
+  // sigue bloqueando el borrado.
   let ocupados = new Set();
+  let conCita = new Map();
   if (esAdmin()) {
-    const { data: citas } = await supabase
-      .from("citas")
-      .select("horario_id")
-      .eq("estado", "confirmada");
-    ocupados = new Set((citas || []).map((c) => c.horario_id));
+    const { data: citas } = await supabase.from("citas").select("horario_id, estado");
+    (citas || []).forEach((c) => {
+      if (c.estado === "confirmada") {
+        ocupados.add(c.horario_id);
+        conCita.set(c.horario_id, "confirmada");
+      } else if (!conCita.has(c.horario_id)) {
+        conCita.set(c.horario_id, "cancelada");
+      }
+    });
   }
 
+  // La selección no sobrevive a un recargado: los ids de la lista cambiaron.
+  seleccionHorarios.clear();
+
   listEl.innerHTML = "";
-  horarios.forEach((h) => listEl.appendChild(renderHorario(h, ocupados)));
+  horarios.forEach((h) => listEl.appendChild(renderHorario(h, ocupados, conCita)));
+
+  // La barra de borrado solo tiene sentido si el admin tiene algo que borrar.
+  const barra = document.getElementById("lote-bar");
+  if (barra) barra.classList.toggle("hidden", !esAdmin());
+  const todos = document.getElementById("chk-todos-horarios");
+  if (todos) todos.checked = false;
+  actualizarBarraLote();
 }
 
-function renderHorario(horario, ocupados) {
+// Deja la barra de borrado en cero y fuera de vista: se usa cuando la lista
+// queda sin filas, para que no quede un contador viejo colgado.
+function apagarBarraLote() {
+  seleccionHorarios.clear();
+  const barra = document.getElementById("lote-bar");
+  if (barra) barra.classList.add("hidden");
+  const todos = document.getElementById("chk-todos-horarios");
+  if (todos) todos.checked = false;
+  actualizarBarraLote();
+}
+
+function renderHorario(horario, ocupados, conCita) {
   const row = document.createElement("div");
   row.className = "card-row";
+
+  // Casilla de borrado en lote: solo admin (RLS no deja borrar al trabajador).
+  // Si hay una cita apuntando al horario, la casilla va deshabilitada y explica
+  // por qué: Postgres rechazaría el DELETE por la clave foránea.
+  if (esAdmin()) {
+    const motivo = conCita ? conCita.get(horario.id) : null;
+    const chk = document.createElement("input");
+    chk.type = "checkbox";
+    chk.className = "chk-horario";
+    chk.dataset.id = horario.id;
+    if (motivo) {
+      chk.disabled = true;
+      chk.title = motivo === "confirmada"
+        ? "Tiene una cita reservada. Cancela la cita para poder eliminarlo."
+        : "Tiene una cita cancelada en el historial que lo referencia y no se puede eliminar.";
+    } else {
+      chk.addEventListener("change", () => {
+        if (chk.checked) seleccionHorarios.add(horario.id);
+        else seleccionHorarios.delete(horario.id);
+        actualizarBarraLote();
+      });
+    }
+    row.appendChild(chk);
+  }
 
   const info = document.createElement("div");
   info.className = "info";
@@ -394,6 +699,18 @@ function renderHorario(horario, ocupados) {
   const chips = document.createElement("div");
   chips.className = "card-row__chips";
   chips.appendChild(chipSede(horario.sede_id));
+
+  // Para el admin, decir en la fila por qué un horario no se puede eliminar
+  // evita que crea que la casilla está rota.
+  const motivoFila = esAdmin() && conCita ? conCita.get(horario.id) : null;
+  if (motivoFila) {
+    const nota = document.createElement("span");
+    nota.className = "chip-bloqueado";
+    nota.textContent = motivoFila === "confirmada"
+      ? "No se puede eliminar: tiene una cita"
+      : "No se puede eliminar: cita cancelada en el historial";
+    chips.appendChild(nota);
+  }
   info.appendChild(chips);
 
   const acciones = document.createElement("div");

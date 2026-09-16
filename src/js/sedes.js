@@ -8,6 +8,7 @@
 
 import { supabase } from "./supabaseClient.js";
 import { COLOR_SEDE_DEFECTO } from "./config.js";
+import { colorLegible, colorSuave } from "./utils.js";
 
 let _sedes = [];
 
@@ -97,19 +98,25 @@ export function llenarSelectSedes(
 
 // Chip de color con el nombre de la sede, para las listas del panel.
 export function chipSede(sedeId) {
+  return armarChip(nombreSede(sedeId), colorSede(sedeId));
+}
+
+// El color de la sede va en el punto, el fondo y el borde; el TEXTO usa su
+// variante oscurecida. Con el amarillo de Jesús María (#eab308) el color crudo
+// sobre blanco da 1.9:1 y no se lee — la misma regla que en el calendario.
+function armarChip(texto, color) {
   const span = document.createElement("span");
   span.className = "chip-sede";
-  span.textContent = nombreSede(sedeId);
-  span.style.setProperty("--chip-color", colorSede(sedeId));
+  span.textContent = texto;
+  span.style.setProperty("--chip-color", color);
+  span.style.setProperty("--chip-texto", colorLegible(color));
+  span.style.setProperty("--chip-fondo", colorSuave(color, 0.14));
+  span.style.setProperty("--chip-borde", colorSuave(color, 0.45));
   return span;
 }
 
 // Chip para quien no está atado a una sola sede (sede_id = NULL en la base).
 // No puede usar chipSede(null): no hay nombre ni color que leer.
 export function chipAmbasSedes() {
-  const span = document.createElement("span");
-  span.className = "chip-sede";
-  span.textContent = "Ambas sedes";
-  span.style.setProperty("--chip-color", COLOR_SEDE_DEFECTO);
-  return span;
+  return armarChip("Ambas sedes", COLOR_SEDE_DEFECTO);
 }

@@ -146,6 +146,98 @@ export function setLoading(button, loading, loadingText) {
   }
 }
 
+// ---------- Color: contraste y variantes legibles ----------
+// El color de cada sede lo carga Luis en la base y puede ser cualquiera. El
+// amarillo de Jesús María (#eab308) sobre blanco da ~1.9:1 de contraste: como
+// TEXTO es ilegible. Por eso, en vez de confiar en que el color venga oscuro,
+// aquí se derivan tres variantes y la interfaz usa la que corresponde:
+//
+//   colorSuave(c)     -> el color mezclado con blanco: sirve de FONDO
+//   colorContraste(c) -> negro o blanco, para el texto que va ENCIMA del color
+//   colorLegible(c)   -> el mismo color oscurecido hasta pasar 4.5:1 sobre
+//                        blanco: la única variante que puede usarse como TEXTO
+//
+// Así un color claro nunca termina siendo texto sobre fondo blanco, sin tener
+// que mantener una lista de excepciones por sede.
+
+function canalLineal(v) {
+  const c = v / 255;
+  return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+
+export function hexARgb(hex) {
+  let h = String(hex || "").trim().replace("#", "");
+  if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) return null;
+  return {
+    r: parseInt(h.slice(0, 2), 16),
+    g: parseInt(h.slice(2, 4), 16),
+    b: parseInt(h.slice(4, 6), 16),
+  };
+}
+
+function rgbAHex({ r, g, b }) {
+  const dos = (n) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, "0");
+  return `#${dos(r)}${dos(g)}${dos(b)}`;
+}
+
+// Luminancia relativa segun WCAG 2.1
+export function luminanciaColor(hex) {
+  const rgb = hexARgb(hex);
+  if (!rgb) return 0;
+  return 0.2126 * canalLineal(rgb.r) + 0.7152 * canalLineal(rgb.g) + 0.0722 * canalLineal(rgb.b);
+}
+
+// Razon de contraste entre dos colores (1 = iguales, 21 = negro sobre blanco).
+export function contrasteColores(hexA, hexB) {
+  const a = luminanciaColor(hexA);
+  const b = luminanciaColor(hexB);
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+
+// Texto que se puede poner ENCIMA de este color.
+export function colorContraste(hex) {
+  return contrasteColores(hex, "#0d0f0e") >= contrasteColores(hex, "#ffffff")
+    ? "#0d0f0e"
+    : "#ffffff";
+}
+
+// El color mezclado con blanco, para usarlo de fondo suave.
+export function colorSuave(hex, proporcion = 0.14) {
+  const rgb = hexARgb(hex);
+  if (!rgb) return "#ffffff";
+  return rgbAHex({
+    r: 255 + (rgb.r - 255) * proporcion,
+    g: 255 + (rgb.g - 255) * proporcion,
+    b: 255 + (rgb.b - 255) * proporcion,
+  });
+}
+
+// El color oscurecido lo justo para poder usarlo como TEXTO sobre blanco.
+// Si ya pasa 4.5:1 se devuelve tal cual; si no, se van bajando los canales
+// (lo que mantiene el tono) hasta que pase.
+export function colorLegible(hex, minimo = 4.5) {
+  const rgb = hexARgb(hex);
+  if (!rgb) return "#0d0f0e";
+  let actual = { ...rgb };
+  for (let i = 0; i < 40; i++) {
+    if (contrasteColores(rgbAHex(actual), "#ffffff") >= minimo) break;
+    actual = { r: actual.r * 0.92, g: actual.g * 0.92, b: actual.b * 0.92 };
+  }
+  return rgbAHex(actual);
+}
+
+// Deja las variantes del color de una sede como variables CSS sobre un
+// elemento, para que las hojas de estilo no tengan que saber nada de contraste.
+export function pintarVariablesSede(el, color) {
+  if (!el) return;
+  el.style.setProperty("--sede-color", color);
+  el.style.setProperty("--sede-suave", colorSuave(color));
+  el.style.setProperty("--sede-borde", colorSuave(color, 0.55));
+  el.style.setProperty("--sede-texto", colorLegible(color));
+  el.style.setProperty("--sede-contraste", colorContraste(color));
+}
+
 // ---------- Ojito de las contraseñas ----------
 // Cada campo de contraseña lleva al lado un botón [data-pwd-toggle] que alterna
 // entre `password` y `text`. Se engancha una sola vez al arrancar, y sirve para

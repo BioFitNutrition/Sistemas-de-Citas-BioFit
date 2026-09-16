@@ -27,6 +27,7 @@ MODULOS = [
     "config.js",
     "supabaseClient.js",
     "utils.js",
+    "calendario.js",
     "sedes.js",
     "auth.js",
     "client.js",

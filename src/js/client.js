@@ -7,10 +7,11 @@
 import { supabase } from "./supabaseClient.js";
 import { DURACION_CITA_MIN, NOMBRE_SERVICIO, ZONA_HORARIA } from "./config.js";
 import {
-  showView, isoLocal, hoyISO, parseISO, addDays, primerDiaDelMes, domingoDe,
+  showView, isoLocal, hoyISO, parseISO, addDays, domingoDe,
   hoy0, capitalizar, formatearFecha, rangoHora, hhmm12, toMin,
-  setLoading, emailValido,
+  setLoading, emailValido, pintarVariablesSede,
 } from "./utils.js";
+import { crearCalendarioMes } from "./calendario.js";
 import { getSedes, getSede, colorSede, mapaEmbedSede, mapsUrlSede } from "./sedes.js";
 
 const state = {
@@ -18,18 +19,20 @@ const state = {
   horarioSeleccionado: null,   // { id, fecha, hora }
   disponibilidad: {},          // { 'YYYY-MM-DD': [ { id, fecha, hora }, ... ] }
   refDia: null,                // primer día visible en las columnas de horarios
-  miniMes: null,               // mes mostrado en el mini calendario
   diaSel: null,                // 'YYYY-MM-DD' del día resaltado
 };
 
 let resizeTimer = null;
+let miniCal = null;            // componente de calendario (izquierda)
 
 // Columnas de días visibles según el ancho de pantalla.
+// En celular no entran 7: se muestran 3 y se avanza con las flechas. Nunca se
+// deja que la franja desborde, porque haría scrollear la página entera de lado.
 function columnasVisibles() {
   const w = window.innerWidth;
   if (w >= 980) return 7;
   if (w >= 680) return 4;
-  return 1;
+  return 3;
 }
 
 // ---------- init ----------
@@ -53,8 +56,14 @@ export function initClientFlow() {
     btn.addEventListener("click", () => showView("view-" + btn.dataset.back));
   });
 
-  document.getElementById("mini-prev").addEventListener("click", () => cambiarMesMini(-1));
-  document.getElementById("mini-next").addEventListener("click", () => cambiarMesMini(1));
+  // El mini calendario es el mismo componente que usa el panel para cargar la
+  // agenda; aquí va en modo "uno" y solo habilita los días que tienen cupo.
+  miniCal = crearCalendarioMes(document.getElementById("mini-cal-host"), {
+    modo: "uno",
+    diaHabilitado: (iso) => Array.isArray(state.disponibilidad[iso]) && state.disponibilidad[iso].length > 0,
+    onSeleccion: (iso) => saltarASemanaDe(iso),
+  });
+
   document.getElementById("week-prev").addEventListener("click", () => cambiarSemana(-1));
   document.getElementById("week-next").addEventListener("click", () => cambiarSemana(1));
 
@@ -102,9 +111,10 @@ async function seleccionarSede(sedeId) {
   document.getElementById("sede-nombre").textContent = sede.nombre || "";
   document.getElementById("sede-ciudad").textContent = sede.direccion || "";
 
-  // Tiñe el encabezado del calendario con el color de la sede.
-  const head = document.querySelector(".gcal-head");
-  if (head) head.style.setProperty("--sede-color", colorSede(sedeId));
+  // Deja el color de la sede (y sus variantes legibles) en toda la vista: de
+  // ahí lo toman el encabezado, el mini calendario y las píldoras de horario.
+  pintarVariablesSede(document.getElementById("view-calendario"), colorSede(sedeId));
+  if (miniCal) miniCal.setColor(colorSede(sedeId));
 
   renderMapaSede(sedeId);
 
@@ -127,14 +137,9 @@ function renderMapaSede(sedeId) {
   const marco = document.getElementById("sede-mapa-frame-wrap");
   const iframe = document.getElementById("sede-mapa-frame");
   const link = document.getElementById("sede-mapa-link");
-  const sede = getSede(sedeId) || {};
 
-  // El filete lateral toma el color de la sede, igual que el encabezado.
-  caja.style.setProperty("--sede-color", colorSede(sedeId));
-
-  document.getElementById("sede-mapa-nombre").textContent = sede.nombre || "";
-  document.getElementById("sede-mapa-dir").textContent = sede.direccion || "";
-
+  // El nombre y la dirección NO se repiten aquí: ya están en el encabezado,
+  // justo encima. Esta tarjeta es solo el "dónde queda".
   // Se limpia antes de pintar: si no, al cambiar de sede quedaría a la vista el
   // mapa de la anterior mientras el nuevo carga.
   iframe.removeAttribute("src");
@@ -147,8 +152,8 @@ function renderMapaSede(sedeId) {
   link.classList.toggle("hidden", !comoLlegar);
   if (comoLlegar) link.href = comoLlegar;
 
-  // Si la sede no tuviera ni dirección ni mapa, la caja no aparece vacía.
-  caja.classList.toggle("hidden", !(sede.direccion || embed || comoLlegar));
+  // Sin mapa ni enlace no hay tarjeta que mostrar.
+  caja.classList.toggle("hidden", !(embed || comoLlegar));
 }
 
 // ---------- carga de disponibilidad ----------
@@ -198,67 +203,34 @@ async function cargarDisponibilidad(sedeId) {
   let ref = domingoDe(primera);
   if (ref < hoy) ref = hoy;
   state.refDia = ref;
-  state.miniMes = primerDiaDelMes(primera);
   state.diaSel = null;
 
   wrap.classList.remove("hidden");
-  renderMiniCal();
+
+  // El calendario se entera de qué días tienen cupo AHORA (cambió la sede o se
+  // recargó la disponibilidad) y se posiciona en el mes del primer día libre.
+  miniCal.setDiaHabilitado((iso) => Array.isArray(state.disponibilidad[iso]) && state.disponibilidad[iso].length > 0);
+  miniCal.irAlMes(fechas[0]);
   renderSemana();
 }
 
-// ---------- mini calendario ----------
+// ---------- salto desde el mini calendario ----------
 
-function cambiarMesMini(delta) {
-  if (!state.miniMes) return;
-  state.miniMes = new Date(state.miniMes.getFullYear(), state.miniMes.getMonth() + delta, 1);
-  renderMiniCal();
-}
-
-function renderMiniCal() {
-  const grid = document.getElementById("mini-grid");
-  const titulo = document.getElementById("mini-title");
-  const btnPrev = document.getElementById("mini-prev");
-
-  const mes = state.miniMes;
-  titulo.textContent = capitalizar(
-    mes.toLocaleDateString("es-PE", { month: "long", year: "numeric" })
-  );
-  btnPrev.disabled = mes <= primerDiaDelMes(new Date());
-
-  const hoyIso = hoyISO();
-  const inicio = domingoDe(primerDiaDelMes(mes));
-
-  grid.innerHTML = "";
-  for (let i = 0; i < 42; i++) {
-    const fecha = addDays(inicio, i);
-    const iso = isoLocal(fecha);
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "mini-cal__day";
-    btn.textContent = String(fecha.getDate());
-
-    if (fecha.getMonth() !== mes.getMonth()) btn.classList.add("is-othermonth");
-
-    const disponible = Array.isArray(state.disponibilidad[iso]) && iso >= hoyIso;
-
-    if (iso === hoyIso) btn.classList.add("is-today");
-    if (disponible) {
-      btn.classList.add("is-available");
-      btn.addEventListener("click", () => seleccionarDia(iso));
-    } else if (iso !== hoyIso) {
-      btn.classList.add("is-off");
-      btn.disabled = true;
-    }
-    if (iso === state.diaSel) btn.classList.add("is-selected");
-
-    grid.appendChild(btn);
+// Al elegir un día en el calendario, la franja salta a SU SEMANA con ese día
+// marcado. En pantallas donde no entran los 7 días, la franja arranca en el día
+// elegido, que es lo que el socio quiere ver.
+function saltarASemanaDe(iso) {
+  state.diaSel = iso || null;
+  if (!iso) {
+    renderSemana();
+    return;
   }
-}
 
-function seleccionarDia(iso) {
-  state.diaSel = iso;
-  state.refDia = parseISO(iso);
-  renderMiniCal();
+  const dia = parseISO(iso);
+  let ref = columnasVisibles() === 7 ? domingoDe(dia) : dia;
+  const hoy = hoy0();
+  if (ref < hoy) ref = hoy;    // la franja nunca muestra días pasados
+  state.refDia = ref;
   renderSemana();
 }
 
@@ -305,7 +277,11 @@ function renderSemana() {
     dow.className = "dow";
     dow.textContent = d.toLocaleDateString("es-PE", { weekday: "short" }).replace(".", "").toUpperCase();
     const num = document.createElement("span");
-    num.className = "num" + (iso === hoyIso ? " is-today" : "");
+    // El día elegido en el mini calendario queda marcado aquí también, para que
+    // se vea de un vistazo a qué día corresponden las píldoras.
+    num.className = "num"
+      + (iso === hoyIso ? " is-today" : "")
+      + (iso === state.diaSel ? " is-selected" : "");
     num.textContent = String(d.getDate());
     head.appendChild(dow);
     head.appendChild(num);
@@ -321,6 +297,8 @@ function renderSemana() {
       col.appendChild(pill);
     });
 
+    // Un día sin horarios no queda en blanco: lleva un guion por fila, para que
+    // las columnas se lean parejas y se note que ahí no hay cupo.
     for (let i = 0; i < filas - slots.length; i++) {
       const dash = document.createElement("span");
       dash.className = "gcal__dash";

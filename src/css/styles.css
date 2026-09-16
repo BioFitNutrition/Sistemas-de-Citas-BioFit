@@ -175,6 +175,7 @@ body {
 /* En la vista de calendario, #app se ensancha para las 7 columnas. */
 #app { transition: max-width 0.2s ease; }
 #app[data-view="view-calendario"] { max-width: 1080px; }
+#app[data-view="view-panel"] { max-width: 880px; }
 
 .gcal-head { margin: 6px 0 4px; }
 .gcal-head__title {
@@ -217,15 +218,22 @@ body {
   .gcal__mini { max-width: 300px; width: 100%; margin: 0 auto; }
 }
 
-/* --- Mini calendario (izquierda) --- */
-.mini-cal__head {
+/* --- Calendario mensual (componente reutilizable: socio y panel) --- */
+/* Los colores salen de las variables que deja pintarVariablesSede():
+   --sede-color    el color tal cual  -> solo de FONDO o BORDE
+   --sede-suave    el color aclarado  -> fondo de los días con cupo
+   --sede-texto    el color oscurecido hasta pasar 4.5:1 -> el único que va de TEXTO
+   --sede-contraste  negro o blanco   -> texto ENCIMA del color sólido
+   Así el amarillo de Jesús María nunca termina siendo texto sobre blanco. */
+
+.cal__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 10px;
 }
-.mini-cal__title { font-weight: 700; font-size: 0.95rem; }
-.mini-cal__nav {
+.cal__title { font-weight: 700; font-size: 0.95rem; }
+.cal__nav {
   background: none;
   border: none;
   color: var(--color-text-muted);
@@ -236,24 +244,25 @@ body {
   height: 28px;
   border-radius: 50%;
 }
-.mini-cal__nav:hover { background: var(--color-neutral-light); color: var(--color-text); }
-.mini-cal__nav:disabled { opacity: 0.3; cursor: not-allowed; }
-.mini-cal__nav:disabled:hover { background: none; color: var(--color-text-muted); }
+.cal__nav:hover { background: var(--color-neutral-light); color: var(--color-text); }
+.cal__nav:disabled { opacity: 0.3; cursor: not-allowed; }
+.cal__nav:disabled:hover { background: none; color: var(--color-text-muted); }
 
-.mini-cal__dow {
+.cal__dow {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 2px;
   margin-bottom: 4px;
 }
-.mini-cal__dow span {
+.cal__dow span {
   text-align: center;
   font-size: 0.7rem;
   font-weight: 700;
   color: var(--color-text-muted);
 }
-.mini-cal__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
-.mini-cal__day {
+.cal__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+
+.cal__day {
   aspect-ratio: 1 / 1;
   display: flex;
   align-items: center;
@@ -267,16 +276,29 @@ body {
   color: var(--color-text);
   cursor: default;
 }
-.mini-cal__day.is-othermonth { color: var(--color-text-muted); opacity: 0.55; }
-.mini-cal__day.is-off { color: var(--color-text-muted); text-decoration: line-through; }
-.mini-cal__day.is-available {
-  background: var(--color-primary-light);
-  color: var(--color-primary-dark);
+.cal__day.is-othermonth { opacity: 0.55; }
+/* Día sin cupo: gris apagado y no clickeable. */
+.cal__day.is-off { color: var(--color-text-muted); text-decoration: line-through; }
+/* Día con cupo: resaltado con el color de la sede. */
+.cal__day.is-available {
+  background: var(--sede-suave, var(--color-primary-light));
+  color: var(--sede-texto, var(--color-primary-dark));
   cursor: pointer;
 }
-.mini-cal__day.is-available:hover { background: var(--color-primary); color: #fff; }
-.mini-cal__day.is-today { background: var(--color-primary); color: #fff; }
-.mini-cal__day.is-selected { box-shadow: 0 0 0 2px var(--color-primary); }
+.cal__day.is-available:hover { background: var(--sede-borde, var(--color-primary-light)); }
+/* Hoy: anillo, para que no se confunda con el día elegido. */
+.cal__day.is-today { box-shadow: inset 0 0 0 2px var(--sede-color, var(--color-primary)); }
+/* Día elegido: relleno sólido con el color de la sede. Va al final para ganarle
+   al hover sin recurrir a !important. */
+.cal__day.is-selected,
+.cal__day.is-available.is-selected:hover {
+  background: var(--sede-color, var(--color-primary));
+  color: var(--sede-contraste, #fff);
+}
+
+/* Selección de varios días (panel): el arrastre no debe seleccionar texto. */
+.cal--varios .cal__grid { user-select: none; }
+.cal--varios .cal__day.is-available { cursor: pointer; }
 
 /* --- Columnas de horarios (derecha) --- */
 .gcal__weekhead {
@@ -335,14 +357,19 @@ body {
   font-weight: 500;
   border-radius: 50%;
 }
-.gcal__dayhd .num.is-today { background: var(--color-primary); color: #fff; }
+.gcal__dayhd .num.is-today { box-shadow: inset 0 0 0 2px var(--sede-color, var(--color-primary)); }
+.gcal__dayhd .num.is-selected {
+  background: var(--sede-color, var(--color-primary));
+  color: var(--sede-contraste, #fff);
+  box-shadow: none;
+}
 
 .gcal__slot {
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--sede-borde, var(--color-border));
   border-radius: 999px;
   padding: 9px 6px;
   background: var(--color-surface);
-  color: var(--color-primary-dark);
+  color: var(--sede-texto, var(--color-primary-dark));
   font-family: inherit;
   font-size: 0.9rem;
   font-weight: 600;
@@ -350,7 +377,10 @@ body {
   cursor: pointer;
   transition: background 0.12s ease, border-color 0.12s ease;
 }
-.gcal__slot:hover { border-color: var(--color-primary); background: var(--color-primary-light); }
+.gcal__slot:hover {
+  border-color: var(--sede-color, var(--color-primary));
+  background: var(--sede-suave, var(--color-primary-light));
+}
 .gcal__slot:active { transform: scale(0.98); }
 .gcal__dash {
   text-align: center;
@@ -660,6 +690,7 @@ body {
 
 /* Encabezado del calendario teñido con el color de la sede */
 .gcal-head { border-left: 4px solid var(--sede-color, transparent); padding-left: 12px; }
+.gcal-head__row #gcal-tz { color: var(--color-text-muted); }
 
 /* Chip con el nombre de la sede y su color */
 .chip-sede {
@@ -670,9 +701,9 @@ body {
   font-weight: 700;
   padding: 3px 10px 3px 8px;
   border-radius: 999px;
-  color: var(--chip-color, var(--color-text-muted));
-  background: color-mix(in srgb, var(--chip-color, #888) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--chip-color, #888) 35%, transparent);
+  color: var(--chip-texto, var(--color-text-muted));
+  background: var(--chip-fondo, var(--color-neutral-light));
+  border: 1px solid var(--chip-borde, var(--color-border));
 }
 .chip-sede::before {
   content: "";
@@ -851,32 +882,31 @@ body {
 
 /* ============================================
    MINI MAPA DE LA SEDE
-   Dirección + mapa + botón "Cómo llegar". Los datos salen de la tabla `sedes`.
+   Solo el mapa y el botón: el nombre y la dirección están en el encabezado,
+   justo encima, y repetirlos se veía redundante.
    El botón es el respaldo del iframe: si el mapa no carga, igual se puede llegar.
    ============================================ */
 
 .sede-mapa {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
-  gap: 18px;
-  align-items: center;
-  margin: 16px 0 4px;
-  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  max-width: 380px;
+  margin: 14px 0 4px;
+  padding: 14px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-left: 4px solid var(--sede-color, var(--color-primary));
   border-radius: var(--radius);
   box-shadow: var(--shadow);
 }
-.sede-mapa__info { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
-.sede-mapa__nombre { font-size: 1rem; }
-.sede-mapa__dir { color: var(--color-text-muted); font-size: 0.88rem; line-height: 1.4; }
 
 .btn-mapa {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  margin-top: 6px;
   padding: 9px 16px;
   border-radius: 999px;
   background: var(--color-primary);
@@ -892,10 +922,7 @@ body {
 .sede-mapa__frame {
   position: relative;
   width: 100%;
-  max-width: 380px;
-  margin-left: auto;
   aspect-ratio: 16 / 9;
-  max-height: 200px;
   border-radius: 10px;
   overflow: hidden;
   background: var(--color-neutral-light);
@@ -909,10 +936,8 @@ body {
   display: block;
 }
 
-/* En celular el mapa va debajo del texto y no rompe el ancho de la pantalla. */
 @media (max-width: 680px) {
-  .sede-mapa { grid-template-columns: minmax(0, 1fr); }
-  .sede-mapa__frame { max-width: none; margin-left: 0; aspect-ratio: 16 / 11; max-height: none; }
+  .sede-mapa { max-width: none; }
   .btn-mapa { width: 100%; justify-content: center; }
 }
 
@@ -922,4 +947,133 @@ body {
   border-radius: 10px;
   padding: 10px 14px;
   color: var(--color-primary-dark);
+}
+
+/* ============================================
+   ALTA DE HORARIOS EN LOTE (panel)
+   Calendario de varios días + franja horaria, en vez de un horario por envío.
+   ============================================ */
+
+.alta {
+  display: grid;
+  grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+  margin-bottom: 24px;
+  padding: 18px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.alta__col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.alta__sede {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-self: stretch;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+.alta__sede select {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-family: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.alta__sede select:focus { outline: 2px solid var(--color-primary); border-color: transparent; }
+.alta__hint { margin: 0; font-size: 0.78rem; color: var(--color-text-muted); line-height: 1.45; }
+.alta__nota { margin: 0; font-size: 0.82rem; color: var(--color-text-muted); line-height: 1.45; }
+
+.alta__rango { display: flex; flex-direction: column; gap: 14px; }
+.alta__rango > label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+/* Los tres selectores de una hora, pegados como un solo control. */
+.hora-sel { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.hora-sel select {
+  padding: 9px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.hora-sel select:focus { outline: 2px solid var(--color-primary); border-color: transparent; }
+.hora-sel__sep { font-weight: 700; color: var(--color-text-muted); }
+
+/* El recuento que aparece antes de guardar: "Vas a crear 36 horarios en 3 días" */
+.alta__resumen {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+.alta__resumen--aviso {
+  background: var(--color-neutral-light);
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+#alta-cal-host { width: 100%; }
+
+@media (max-width: 760px) {
+  .alta { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .alta__col:first-child { max-width: 320px; }
+  .alta .btn-primary { width: 100%; }
+}
+
+/* ============================================
+   BORRADO EN LOTE (solo admin)
+   ============================================ */
+
+.lote-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  background: var(--color-neutral-light);
+  border-radius: 10px;
+}
+.lote-bar__todos {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.lote-bar input[type="checkbox"],
+.chk-horario { width: 17px; height: 17px; accent-color: var(--color-primary); cursor: pointer; }
+.chk-horario:disabled { cursor: not-allowed; opacity: 0.4; }
+
+/* Por qué un horario no se puede eliminar, dicho en la fila. */
+.chip-bloqueado {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--color-danger-light);
+  color: var(--color-danger);
 }

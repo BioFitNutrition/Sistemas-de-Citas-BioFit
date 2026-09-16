@@ -69,7 +69,12 @@ recibir citas de cualquier sede.
 
 ---
 
-## 🎨 2. Panel de admin — agregar horarios con calendario visual
+## ✅ 2. Panel de admin — agregar horarios con calendario visual — HECHO (15/09/2026)
+
+> Hecho con el componente `calendario.js`, compartido con la pantalla del socio.
+> Calendario de varios días (clic y arrastre), franja horaria con selectores y
+> AM/PM, intervalo fijo de 20 min, recuento previo y confirmación, duplicados
+> saltados en silencio. Falta probarlo con sesión de admin: ver `ESTADO.md`.
 
 Hoy son tres campos sueltos (sede / fecha / hora) y es tedioso. Luis quiere:
 
@@ -80,12 +85,24 @@ Hoy son tres campos sueltos (sede / fecha / hora) y es tedioso. Luis quiere:
 Objetivo de fondo: cargar la agenda de una semana o un mes completo sin repetir
 el mismo formulario decenas de veces.
 
-## 3. Revisar la generación de horarios
+## 🔍 3. Revisar la generación de horarios — PARCIAL (15/09/2026)
 
 Verificar que la creación de horarios esté funcionando bien en todos los casos
 (fechas, duplicados, ambas sedes, el trigger de disponibilidad).
 
-## 4. Eliminar horarios en lote
+> Al rehacer el alta (punto 2) quedaron cubiertos por código y probados en
+> navegador: fechas locales con `isoLocal()`, imposible elegir días pasados,
+> duplicados saltados sin abortar la carga, y la sede elegida en el formulario.
+> **Falta la pasada real con sesión de admin** contra la base.
+
+## ✅ 4. Eliminar horarios en lote — HECHO (15/09/2026)
+
+> Casillas por fila + "seleccionar todos los visibles" (respeta el filtro de
+> sede), botón con el número y confirmación. Solo admin. Los horarios que tienen
+> una cita apuntándolos van con la casilla deshabilitada y el motivo a la vista:
+> la FK `citas.horario_id` no tiene ON DELETE, así que Postgres rechazaría el
+> borrado — **incluso si la cita está cancelada**. Falta probarlo con sesión de
+> admin: ver `ESTADO.md`.
 
 Poder **seleccionar varios horarios con casillas** y borrarlos de una vez, en vez
 de uno por uno.
