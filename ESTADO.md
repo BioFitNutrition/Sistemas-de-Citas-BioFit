@@ -15,9 +15,16 @@
 |---|---|
 | **Fecha** | 15/09/2026 |
 | **Última escritura** | Claude Code |
-| **Siguiente** | Christopher — hacer `git push` y probar el panel con sesión de admin |
+| **Siguiente** | Christopher — `git push` (queda **1 commit** sin subir) y probar el panel con la cuenta de Luis |
 
-⚠️ **Hay un commit hecho y SIN SUBIR.** El push quedó pendiente a propósito.
+⚠️ **Falta subir 1 commit.** El del calendario compartido ya se publicó; el de
+hoy (las dos secciones y el agrupado por día) todavía no.
+
+```
+(último)  Horarios del panel: dos secciones, agrupados por día, color de marca   ← SIN SUBIR
+161bfcc   Calendario compartido: socio, alta en lote y borrado en lote           ← publicado
+0f8a231   Arregla el bug del trabajador, mini mapa e interfaz                    ← publicado
+```
 
 ---
 
@@ -26,7 +33,7 @@
 El sistema **está en producción y funcionando**. No es un prototipo.
 
 - Base de datos completa y verificada en Supabase (`snuefzvfhucgfllnifat`)
-- Frontend modular publicado en GitHub Pages
+- Frontend modular publicado en GitHub Pages (un commit atrás, ver arriba)
 - Las dos Edge Functions **desplegadas y activas** (`notify-cita`, `crear-usuario`)
 - **Los correos funcionan y están probados en producción**
 - 3 roles funcionando: socio (anónimo), trabajador, admin. RLS los separa de
@@ -38,147 +45,113 @@ El sistema **está en producción y funcionando**. No es un prototipo.
 
 ## 3. Qué cambió la última vez
 
-**Claude Code tocó SOLO el frontend (`/src`) y `build.py`. La base de datos no se
-tocó** — solo se consultó para confirmar el contrato (FK, políticas, defaults).
+**Solo frontend (`/src`). La base de datos no se tocó.** Tres cambios en la
+pestaña **Horarios** del panel, todos pedidos por Christopher.
 
-Tanda de tres partes, unidas por un mismo componente de calendario nuevo.
+### 📂 La lista se partió en dos secciones
 
-### 🆕 `src/js/calendario.js` — el componente compartido
+Antes iba todo mezclado y no se distinguía qué quedaba realmente libre:
 
-El mini calendario vivía incrustado en `client.js`, atado a ids fijos del HTML.
-Se extrajo a un componente que se monta sobre un contenedor vacío y se pinta
-solo, así que puede haber dos en la misma página sin pisarse:
-
-- **modo `"uno"`** → el socio elige el día de su cita
-- **modo `"varios"`** → el panel marca varios días (clic para marcar/desmarcar y
-  arrastre con el mouse)
-
-En pantallas táctiles el arrastre queda fuera **a propósito**: capturarlo
-impediría desplazar la página con el dedo sobre el calendario. Ahí se marca
-tocando, que funciona igual.
-
-También trae `serieDeHoras(inicio, fin, paso)`, que genera la serie de una franja
-(5:00pm→7:00pm da 5:00, 5:20, 5:40, 6:00, 6:20, 6:40). La última cita **termina**
-dentro de la franja, no empieza al final.
-
-### 🎨 Regla de color, resuelta de una vez
-
-El color de cada sede lo carga Luis en la base y puede ser cualquiera. El amarillo
-de Jesús María (`#eab308`) sobre blanco da **1.92:1**: como texto es ilegible.
-En vez de una lista de excepciones, `utils.js` ahora deriva las variantes:
-
-| Variante | Para qué |
+| Sección | Qué lleva |
 |---|---|
-| `--sede-color` | el color crudo → **solo fondo, borde o punto** |
-| `--sede-suave` | aclarado con blanco → fondo de los días con cupo |
-| `--sede-texto` | oscurecido hasta pasar 4.5:1 → **la única que va de texto** |
-| `--sede-contraste` | negro o blanco → texto **encima** del color sólido |
+| **Libres** | creados y todavía reservables (`disponible = true`) |
+| **Reservados o deshabilitados** | ya no se pueden reservar: o tienen una cita, o se deshabilitaron a mano |
 
-Con el amarillo, el texto termina siendo `#8e6d05` (4.84:1) y el relleno del día
-elegido es el amarillo real con texto casi negro (10.9:1). Sirve para cualquier
-color que Luis cargue mañana, sin tocar código.
+Cada una con su propio contador. Dentro de la segunda, la etiqueta de cada fila
+sigue diciendo si es **Ocupado** (tiene cita) o **Deshabilitado** (a mano).
 
-**De paso se arregló un caso real que estaba mal:** los chips de sede del panel
-usaban el color crudo como texto — el chip de Jesús María era amarillo sobre
-blanco. Ahora el color va en el punto, el fondo y el borde.
+⚠️ **Los horarios ELIMINADOS no se pueden listar:** al borrarlos se va la fila de
+la base, no queda nada que mostrar. Si algún día hace falta el historial de
+borrados, habría que agregar una columna de "archivado" en vez de borrar de
+verdad — eso sí tocaría la base y hay que decidirlo aparte.
 
-### 🅰️ Parte A — Pantalla del socio
+### 📅 Agrupados por día, desplegables
 
-- Encabezado con nombre de sede, "Citas de 20 min", dirección, mini mapa y la
-  **zona horaria** (de `ZONA_HORARIA`, en `config.js`)
-- Mini calendario: días con cupo resaltados con el color de la sede, días sin
-  cupo en gris tachado y no clickeables, día elegido en relleno sólido, hoy con
-  un anillo (antes hoy y elegido se pisaban)
-- Al elegir un día, la franja **salta a su semana** con ese día marcado también
-  en la cabecera de la columna
-- Píldoras de horario con borde del color de la sede y texto legible
-- **Celular: 3 días a la vez** con las flechas (antes era 1). Verificado que la
-  página no scrollea de lado
-- La tarjeta del mapa dejó de repetir nombre y dirección: ya estaban justo
-  encima. **Esto cierra la decisión que quedó abierta la vez pasada.**
+Una fila por horario llenaba la pantalla: una semana cargada son cientos. Ahora
+**cada día es una sola fila** que se despliega para ver sus horas.
 
-### 🅱️ Parte B — Alta de horarios en lote (`TAREAS.md` 2)
+- La cabecera del día muestra la fecha, cuántos horarios tiene y la franja que
+  cubre (`5:00pm – 6:20pm`), que es lo único que hace falta con el día cerrado
+- Se abre el primer día de cada sección; el resto arranca cerrado
+- **Se recuerda qué días dejaste abiertos**, para que recargar la lista (al
+  habilitar un horario, o por realtime) no te los cierre en la cara
+- Casilla por día para marcar todas sus horas de una vez, con estado "a medias"
+  cuando solo algunas están marcadas. Su clic no abre ni cierra el desplegable
+- Dentro del día, cada fila muestra la **hora** (`5:00 – 5:20pm`), no la fecha:
+  la fecha ya está en la cabecera
 
-Reemplaza los tres campos sueltos: calendario de varios días + franja horaria con
-selectores (hora, minutos de 5 en 5, AM/PM — **nada de teclear la hora**),
-intervalo fijo de 20 minutos, y antes de guardar el recuento en vivo
-**"Vas a crear 36 horarios en 3 días"** con confirmación.
+### 🎨 El calendario del panel usa la paleta del sistema
 
-- No se pueden elegir fechas pasadas (el calendario no las habilita)
-- Los duplicados se **saltan en silencio** con `ON CONFLICT DO NOTHING` y al
-  final informa **"30 creados, 6 ya existían"**. El recuento se mide contra la
-  base **antes** de insertar, para no depender de lo que devuelva el driver
-- El trabajador solo puede crear en su sede (RLS lo respalda)
+Se teñía con el color de la sede y el amarillo de Jesús María no pegaba en una
+pantalla interna. Ahora va siempre con el **teal de la marca (`#147362`)**,
+elijas la sede que elijas.
 
-⚠️ **NO cambiar ese `upsert` con `ignoreDuplicates: true` por un upsert normal.**
-Pisaría la fila existente y podría volver a marcar como disponible un horario ya
-reservado o deshabilitado a mano: así se genera una doble reserva.
+El color por sede se queda donde sí sirve: **el calendario del socio** (lo orienta
+sobre dónde va a ir) y **los chips de las listas** (identifican la sede de un
+vistazo). Ahí sigue aplicando la regla de contraste: el color crudo va de fondo,
+borde o punto, nunca de texto.
 
-### 🅲 Parte C — Borrado en lote (`TAREAS.md` 4)
+### Extra
 
-Casillas por fila, "seleccionar todos los visibles" (respeta el filtro de sede),
-botón con el número y confirmación. **Solo admin**, porque RLS solo deja borrar
-al admin.
-
-⚠️ **El detalle importante:** `citas.horario_id` es una FK **sin `ON DELETE`**, así
-que Postgres rechaza borrar un horario que tenga una cita apuntándolo. Y hay un
-caso traicionero: **una cita cancelada libera el horario** (vuelve a verse
-"Libre") **pero sigue bloqueando el borrado**. Por eso esas casillas van
-deshabilitadas y la fila dice por qué, en vez de dejar que el borrado falle.
+Al habilitar o deshabilitar un horario ahora sale un aviso diciendo a qué sección
+se movió. Sin eso, el horario simplemente desaparecía de donde estabas mirando.
 
 ### Archivos tocados
 
-`src/js/calendario.js` (nuevo) · `src/js/utils.js` · `src/js/client.js` ·
-`src/js/panel.js` · `src/js/sedes.js` · `src/index.html` · `src/css/styles.css` ·
-`build.py` (registra el módulo nuevo)
-→ `python build.py` regeneró el `index.html` de la raíz (768 KB).
+`src/js/panel.js` · `src/css/styles.css`
+→ `python build.py` regeneró el `index.html` de la raíz (776 KB).
 
 ---
 
-## 4. Cómo se verificó — y qué NO se pudo probar
+## 4. Cómo se verificó
 
-**Probado en un navegador real (Chromium) contra la base de producción:**
+Esta vez **sí se pudo probar la vista de administrador**, sin tocar la base: se
+siembra una sesión en `localStorage` y se interceptan las respuestas de Supabase
+con datos de prueba (Playwright). Eso cubre los caminos que antes quedaron sin
+probar por no tener credenciales.
 
-- Flujo completo del socio: elegir sede → día → horario → formulario de reserva,
-  con la fecha y la sede correctas. **No se reservó ninguna cita.**
-- Cambiar de sede repinta el calendario con el otro color y la otra
-  disponibilidad
-- El texto de las píldoras y de los días sale `#8e6d05`, no el amarillo crudo
-- Navegación de meses, y que no se pueda retroceder antes del mes actual
-- Alta en lote: 42 celdas, 16 días pasados bloqueados, clic que marca y
-  desmarca, arrastre que marca **y** que borra según dónde arranque, soltar
-  fuera del calendario sin que quede "pegado"
-- Los textos del recuento: "Vas a crear 18 horarios en 3 días — de 5:00pm a
-  7:00pm", "La hora de fin tiene que ser posterior a la de inicio", "La franja es
-  más corta que una cita de 20 minutos"
-- Celular (390 px): 3 columnas y **sin scroll horizontal de la página**
-- La lista de horarios sigue cargando (88 filas) y **sin sesión no aparecen ni
-  casillas ni barra de borrado**
-- `serieDeHoras()` probada aparte con casos borde (franja invertida, igual, que
-  no cierra en múltiplo de 20)
-- `python build.py` sin colisiones y el bundle combinado pasa `node --check`
+Con un juego de 9 horarios repartidos en 3 días (uno con cita confirmada, uno con
+cita cancelada, uno deshabilitado a mano) se comprobó:
 
-🚨 **Lo que NO se pudo probar, y hay que probar:** todo lo que exige **sesión de
-admin**. No hay credenciales a mano y crear un usuario habría tocado la base.
-Queda verificado por código y por DOM, pero **sin una pasada real**:
+- Las dos secciones, con sus contadores: **Libres 6**, **Reservados o
+  deshabilitados 3**
+- El agrupado por día y las cabeceras: *"Domingo, 20 de setiembre · 4 horarios ·
+  5:00pm – 6:20pm"*
+- El primer día abierto y el resto cerrado
+- 9 casillas, **2 deshabilitadas** con su motivo a la vista ("tiene una cita" /
+  "cita cancelada en el historial")
+- Las etiquetas de la segunda sección: Ocupado, Deshabilitado, Deshabilitado
+- Marcar el día entero → "Eliminar 4 horarios"; marcar todos los visibles →
+  "Eliminar 7 horarios" (los 9 menos los 2 bloqueados); marcar una sola hora deja
+  la casilla del día **a medias**
+- El calendario del panel se queda en `#147362` aunque se elija Jesús María
+- Celular (390 px): **sin scroll horizontal**
+- Sin errores de consola
 
-1. **Crear horarios de verdad** (el `INSERT` con RLS de admin y de trabajador)
-2. **El recuento "X creados, Y ya existían"** contra datos reales
-3. **Las casillas de borrado**: que aparezcan, que las bloqueadas se vean
-   bloqueadas y que el borrado funcione
-4. Que el trabajador **no vea** casillas ni botón de eliminar
+También se repitió la regresión del **flujo del socio** contra la base real
+(elegir sede → día → horario → formulario, sin reservar nada): sigue intacto, y
+su calendario conserva el color de la sede.
+
+🚨 **Lo que sigue SIN probarse contra la base real** (necesita la cuenta de Luis):
+
+1. **Crear horarios de verdad** — el `INSERT` con RLS de admin y de trabajador
+2. **El recuento "X creados, Y ya existían"** con datos reales
+3. **El borrado en lote** ejecutándose de verdad
+4. Que el **trabajador** no vea casillas ni botón de eliminar, y que vea la cita
+   delegada de la otra sede (esto viene pendiente de dos tandas atrás)
+
+La simulación cubre el render y la interacción, pero **no** las políticas RLS ni
+los triggers: eso solo se confirma entrando con una cuenta real.
 
 ---
 
 ## 5. Qué toca AHORA
 
-1. **`git push`** — hay un commit local sin subir.
-2. **Probar el panel con la cuenta de Luis** (admin): crear una tanda chica de
-   horarios en una fecha lejana, ver el recuento, y borrarla con las casillas.
-   Ojo a los 4 puntos de arriba.
-3. **Probar con un trabajador** — sigue pendiente de la tanda anterior: que vea
-   la cita delegada de la OTRA sede, y que en Horarios solo vea los de la suya.
-   Eso cierra el punto 9 de `TAREAS.md`.
+1. **`git push`** — queda 1 commit local sin subir.
+2. **Entrar con la cuenta de Luis** y revisar los 4 puntos de arriba. Sugerencia:
+   crear una tanda chica en una fecha lejana, ver el recuento, y borrarla con las
+   casillas.
+3. **Probar con un trabajador** — cierra el punto 9 de `TAREAS.md`.
 4. Después: punto 6 ("Soy nuevo", el mini mapa ya está listo para reutilizarse),
    punto 11 ("¿Olvidaste tu contraseña?", el ojito ya está hecho), punto 10.
 5. Cuando se toque la base: `cancelada_por` (puntos 7 y 13). **Avisar antes.**
@@ -204,24 +177,23 @@ Queda verificado por código y por DOM, pero **sin una pasada real**:
 10. **La lista de citas del trabajador no se filtra por sede.**
 11. **El color de la sede nunca se usa como texto sobre blanco.** Para texto va
     `--sede-texto` (o `colorLegible()`); el color crudo, solo de fondo, borde o
-    punto.
+    punto. Y en el **panel** no se usa color de sede para el calendario: ahí
+    manda la paleta de la marca.
 12. **El alta en lote usa `ignoreDuplicates: true`.** Un upsert normal pisaría
     horarios existentes y puede provocar doble reserva.
+13. **Un horario con cualquier cita apuntándolo no se puede borrar**, aunque la
+    cita esté cancelada y el horario figure como libre: la FK `citas.horario_id`
+    no tiene `ON DELETE`.
 
 ---
 
 ## 7. Decisiones que dependen de Christopher
 
-Ninguna abierta.
+Una sola, y sin apuro:
 
-La que había —el nombre y la dirección repetidos en la pantalla de horarios— se
-resolvió en esta tanda: se quitaron de la tarjeta del mapa y quedaron solo en el
-encabezado, que es donde los pedía la Parte A.
-
-Dos cosas que decidí solo, por si no coinciden con lo que esperabas:
-
-- **Celular: 3 días a la vez** con flechas, en vez de scroll horizontal en la
-  franja. Las dos opciones estaban permitidas; con 3 columnas no hay ningún
-  scroll lateral y se sigue viendo el día completo.
-- **Los minutos van de 5 en 5** en los selectores de hora (no solo 00/20/40).
-  Es para no bloquear casos como los horarios de 8:10 que ya existen en la base.
+**¿Hace falta ver los horarios eliminados?** Hoy no se puede: al borrarlos
+desaparece la fila. Si Luis quiere ese historial, la forma sería no borrar de
+verdad sino marcarlos como archivados — eso **sí toca la base** (una columna
+nueva) y hay que decidirlo antes de hacerlo. Mientras tanto, la sección
+"Reservados o deshabilitados" cubre los otros dos casos que pediste: los que
+tienen cita y los deshabilitados a mano.

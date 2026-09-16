@@ -9,16 +9,18 @@ import { supabase } from "./supabaseClient.js";
 import { getPerfil, esAdmin, esTrabajador, miSede } from "./auth.js";
 import {
   showView, showToast, formatearFecha, formatearHora, hoyISO, escapeHtml, setLoading,
-  hhmm12, toMin,
+  hhmm12, toMin, rangoHora,
 } from "./utils.js";
 import { crearCalendarioMes, serieDeHoras } from "./calendario.js";
-import { llenarSelectSedes, chipSede, nombreSede, colorSede } from "./sedes.js";
+import { llenarSelectSedes, chipSede, nombreSede } from "./sedes.js";
 import { DURACION_CITA_MIN } from "./config.js";
 
 let realtimeChannel = null;
 let trabajadores = [];   // cache para los selects de delegación (solo admin)
 let altaCal = null;      // calendario de alta de horarios (modo "varios")
 let seleccionHorarios = new Set();   // ids marcados para borrar en lote (admin)
+let diasAbiertos = new Set();        // "seccion|fecha" de los días desplegados
+let tocoLosDias = false;             // true cuando el usuario abrió o cerró alguno
 
 // Sede a la que el usuario está amarrado, o null si puede elegir entre todas.
 // El admin siempre puede. El trabajador solo si su perfil tiene sede_id NULL,
@@ -91,9 +93,8 @@ export async function entrarAlPanel() {
     el.classList.toggle("hidden", Boolean(miSedeFija));
   });
 
-  // El calendario de alta toma el color de la sede activa (la elegida por el
-  // admin, o la fija del trabajador).
-  alCambiarSedeAlta();
+  // Refresca el recuento del alta con la sede que corresponda al rol.
+  actualizarResumenAlta();
 
   if (esAdmin()) await cargarTrabajadores();
 
@@ -376,8 +377,11 @@ function sedeDelAlta() {
   return sedeFija() ?? document.getElementById("nuevo-horario-sede").value;
 }
 
+// El calendario del panel NO se tiñe con el color de la sede: es una pantalla
+// interna y va con el teal de la marca. El color por sede se queda donde sirve
+// para orientar al socio (su calendario) y donde identifica la sede de un vistazo
+// (los chips de las listas).
 function alCambiarSedeAlta() {
-  if (altaCal) altaCal.setColor(colorSede(sedeDelAlta()));
   actualizarResumenAlta();
 }
 
@@ -542,6 +546,16 @@ function actualizarBarraLote() {
   // La casilla de arriba refleja el estado real de la lista.
   const libres = document.querySelectorAll("#horarios-list .chk-horario:not(:disabled)").length;
   if (todos) todos.checked = libres > 0 && n === libres;
+
+  // Y cada día muestra si está entero, a medias o sin marcar.
+  document.querySelectorAll("#horarios-list .dia").forEach((det) => {
+    const chkDia = det.querySelector(".chk-dia");
+    if (!chkDia) return;
+    const casillas = [...det.querySelectorAll(".chk-horario:not(:disabled)")];
+    const marcadas = casillas.filter((c) => c.checked).length;
+    chkDia.checked = casillas.length > 0 && marcadas === casillas.length;
+    chkDia.indeterminate = marcadas > 0 && marcadas < casillas.length;
+  });
 }
 
 async function onBorrarSeleccionados() {
@@ -639,8 +653,29 @@ export async function cargarHorarios() {
   // La selección no sobrevive a un recargado: los ids de la lista cambiaron.
   seleccionHorarios.clear();
 
+  // Dos secciones en la misma pestaña: lo que sigue disponible, y lo que ya no
+  // lo está (reservado o deshabilitado a mano). Antes iba todo mezclado y no se
+  // distinguía de un vistazo qué quedaba realmente libre.
+  const libres = horarios.filter((h) => h.disponible);
+  const tomados = horarios.filter((h) => !h.disponible);
+
   listEl.innerHTML = "";
-  horarios.forEach((h) => listEl.appendChild(renderHorario(h, ocupados, conCita)));
+  listEl.appendChild(renderSeccionHorarios({
+    clave: "libres",
+    titulo: "Libres",
+    ayuda: "Creados y todavía disponibles para reservar.",
+    horarios: libres,
+    vacio: "No queda ningún horario libre. Crea más con el calendario de arriba.",
+    ocupados, conCita,
+  }));
+  listEl.appendChild(renderSeccionHorarios({
+    clave: "tomados",
+    titulo: "Reservados o deshabilitados",
+    ayuda: "Ya no se pueden reservar: o tienen una cita, o los deshabilitaste a mano.",
+    horarios: tomados,
+    vacio: "Ninguno por ahora.",
+    ocupados, conCita,
+  }));
 
   // La barra de borrado solo tiene sentido si el admin tiene algo que borrar.
   const barra = document.getElementById("lote-bar");
@@ -650,20 +685,131 @@ export async function cargarHorarios() {
   actualizarBarraLote();
 }
 
-// Deja la barra de borrado en cero y fuera de vista: se usa cuando la lista
-// queda sin filas, para que no quede un contador viejo colgado.
-function apagarBarraLote() {
-  seleccionHorarios.clear();
-  const barra = document.getElementById("lote-bar");
-  if (barra) barra.classList.add("hidden");
-  const todos = document.getElementById("chk-todos-horarios");
-  if (todos) todos.checked = false;
-  actualizarBarraLote();
+// Una sección ("Libres" / "Reservados o deshabilitados") con sus días adentro.
+function renderSeccionHorarios({ clave, titulo, ayuda, horarios, vacio, ocupados, conCita }) {
+  const seccion = document.createElement("section");
+  seccion.className = "grupo grupo--" + clave;
+
+  const cab = document.createElement("div");
+  cab.className = "grupo__head";
+
+  const h = document.createElement("h3");
+  h.className = "grupo__titulo";
+  h.textContent = titulo;
+  cab.appendChild(h);
+
+  const cuenta = document.createElement("span");
+  cuenta.className = "grupo__cuenta";
+  cuenta.textContent = String(horarios.length);
+  cab.appendChild(cuenta);
+
+  seccion.appendChild(cab);
+
+  const nota = document.createElement("p");
+  nota.className = "grupo__ayuda";
+  nota.textContent = ayuda;
+  seccion.appendChild(nota);
+
+  if (horarios.length === 0) {
+    const vacia = document.createElement("p");
+    vacia.className = "empty-state empty-state--chica";
+    vacia.textContent = vacio;
+    seccion.appendChild(vacia);
+    return seccion;
+  }
+
+  // Agrupar por fecha. La consulta ya viene ordenada por fecha y hora, así que
+  // el orden de inserción del Map es el cronológico.
+  const porFecha = new Map();
+  horarios.forEach((hor) => {
+    if (!porFecha.has(hor.fecha)) porFecha.set(hor.fecha, []);
+    porFecha.get(hor.fecha).push(hor);
+  });
+
+  let primero = true;
+  porFecha.forEach((delDia, fecha) => {
+    seccion.appendChild(renderDia({ clave, fecha, delDia, ocupados, conCita, primero }));
+    primero = false;
+  });
+
+  return seccion;
+}
+
+// Un día desplegable: una sola fila cuando está cerrado, en vez de una por hora.
+function renderDia({ clave, fecha, delDia, ocupados, conCita, primero }) {
+  const det = document.createElement("details");
+  det.className = "dia";
+
+  // Se recuerda qué días dejó abiertos el usuario para que recargar la lista
+  // (al habilitar un horario, o por realtime) no se los cierre en la cara.
+  const idDia = clave + "|" + fecha;
+  det.open = tocoLosDias ? diasAbiertos.has(idDia) : primero;
+  if (det.open) diasAbiertos.add(idDia);
+
+  det.addEventListener("toggle", () => {
+    tocoLosDias = true;
+    if (det.open) diasAbiertos.add(idDia);
+    else diasAbiertos.delete(idDia);
+  });
+
+  const sum = document.createElement("summary");
+  sum.className = "dia__sum";
+
+  // Casilla para marcar el día entero. Va dentro del summary, así que su clic
+  // no debe llegar a abrir o cerrar el desplegable.
+  if (esAdmin()) {
+    const seleccionables = delDia.filter((hor) => !conCita.get(hor.id));
+    if (seleccionables.length > 0) {
+      const chkDia = document.createElement("input");
+      chkDia.type = "checkbox";
+      chkDia.className = "chk-dia";
+      chkDia.title = "Marcar todos los de este día";
+      chkDia.addEventListener("click", (e) => e.stopPropagation());
+      chkDia.addEventListener("change", () => {
+        seleccionables.forEach((hor) => {
+          if (chkDia.checked) seleccionHorarios.add(hor.id);
+          else seleccionHorarios.delete(hor.id);
+        });
+        det.querySelectorAll(".chk-horario:not(:disabled)").forEach((c) => {
+          c.checked = chkDia.checked;
+        });
+        actualizarBarraLote();
+      });
+      sum.appendChild(chkDia);
+    }
+  }
+
+  const texto = document.createElement("span");
+  texto.className = "dia__fecha";
+  texto.textContent = formatearFecha(fecha);
+  sum.appendChild(texto);
+
+  const cuantos = document.createElement("span");
+  cuantos.className = "dia__cuenta";
+  cuantos.textContent = plural(delDia.length, "horario", "horarios");
+  sum.appendChild(cuantos);
+
+  // Con el día cerrado, la franja que cubre es lo único que hace falta saber.
+  const franja = document.createElement("span");
+  franja.className = "dia__franja";
+  const inicio = hhmm12(toMin(delDia[0].hora), true);
+  const fin = hhmm12(toMin(delDia[delDia.length - 1].hora) + DURACION_CITA_MIN, true);
+  franja.textContent = delDia.length === 1 ? inicio : inicio + " – " + fin;
+  sum.appendChild(franja);
+
+  det.appendChild(sum);
+
+  const cuerpo = document.createElement("div");
+  cuerpo.className = "dia__cuerpo";
+  delDia.forEach((hor) => cuerpo.appendChild(renderHorario(hor, ocupados, conCita)));
+  det.appendChild(cuerpo);
+
+  return det;
 }
 
 function renderHorario(horario, ocupados, conCita) {
   const row = document.createElement("div");
-  row.className = "card-row";
+  row.className = "card-row card-row--hora";
 
   // Casilla de borrado en lote: solo admin (RLS no deja borrar al trabajador).
   // Si hay una cita apuntando al horario, la casilla va deshabilitada y explica
@@ -692,8 +838,9 @@ function renderHorario(horario, ocupados, conCita) {
   const info = document.createElement("div");
   info.className = "info";
 
+  // La fecha ya está en la cabecera del día: aquí basta la hora.
   const cuando = document.createElement("strong");
-  cuando.textContent = `${formatearFecha(horario.fecha)}, ${formatearHora(horario.hora)}`;
+  cuando.textContent = rangoHora(horario.hora);
   info.appendChild(cuando);
 
   const chips = document.createElement("div");
@@ -763,6 +910,11 @@ async function alternarHorario(id, nuevoValor) {
     console.error(error);
     return;
   }
+  // Al cambiar de estado, el horario salta de sección. Sin aviso no se nota
+  // adónde se fue.
+  showToast(nuevoValor
+    ? "Horario habilitado. Vuelve a «Libres»."
+    : "Horario deshabilitado. Pasa a «Reservados o deshabilitados».");
   cargarHorarios();
 }
 
