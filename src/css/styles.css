@@ -766,3 +766,160 @@ body {
   .card-row__acciones { width: 100%; justify-content: flex-start; }
   .select-asignar { max-width: 100%; flex: 1; }
 }
+
+/* ============================================
+   BOTONES DE SESIÓN — "Team Enterprise" y "Cerrar sesión"
+   Antes eran links planos y se veían pobres al lado del resto de la interfaz.
+   Mismo lenguaje de botón para los dos, con la paleta de marca.
+   ============================================ */
+
+.btn-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.btn-pill:active { transform: scale(0.97); }
+.btn-pill__ico { flex-shrink: 0; }
+
+/* Sobre el header negro: contorno crema que al pasar el mouse se llena de teal. */
+.btn-pill--ghost {
+  background: rgba(212, 203, 185, 0.08);
+  border-color: rgba(212, 203, 185, 0.35);
+  color: var(--color-brand-cream);
+}
+.btn-pill--ghost:hover {
+  background: var(--color-brand-teal);
+  border-color: var(--color-brand-teal);
+  color: var(--color-header-bg);
+}
+
+/* Cerrar sesión: contorno neutro que se vuelve rojo al pasar el mouse, para
+   que se lea como una salida sin gritar en reposo. */
+.btn-pill--salir {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text-muted);
+  box-shadow: var(--shadow);
+}
+.btn-pill--salir:hover {
+  background: var(--color-danger-light);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+/* ============================================
+   OJITO DE LAS CONTRASEÑAS
+   ============================================ */
+
+.pwd-field { position: relative; display: flex; width: 100%; }
+.pwd-field input { width: 100%; padding-right: 42px; }
+
+.pwd-toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.pwd-toggle:hover { color: var(--color-primary); background: var(--color-primary-light); }
+.pwd-toggle:focus-visible { outline: 2px solid var(--color-primary); }
+.pwd-toggle.is-on { color: var(--color-primary); }
+
+/* Un solo ícono a la vez: ojo cerrado cuando la contraseña está a la vista. */
+.pwd-toggle .ico-ojo-off { display: none; }
+.pwd-toggle.is-on .ico-ojo { display: none; }
+.pwd-toggle.is-on .ico-ojo-off { display: inline-flex; }
+
+/* ============================================
+   MINI MAPA DE LA SEDE
+   Dirección + mapa + botón "Cómo llegar". Los datos salen de la tabla `sedes`.
+   El botón es el respaldo del iframe: si el mapa no carga, igual se puede llegar.
+   ============================================ */
+
+.sede-mapa {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 18px;
+  align-items: center;
+  margin: 16px 0 4px;
+  padding: 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--sede-color, var(--color-primary));
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.sede-mapa__info { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.sede-mapa__nombre { font-size: 1rem; }
+.sede-mapa__dir { color: var(--color-text-muted); font-size: 0.88rem; line-height: 1.4; }
+
+.btn-mapa {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 6px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.btn-mapa:hover { background: var(--color-primary-dark); }
+
+/* "Mini" mapa: acotado a propósito para que ubique la sede sin empujar los
+   horarios fuera de la pantalla — lo que el socio viene a hacer es reservar. */
+.sede-mapa__frame {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+  margin-left: auto;
+  aspect-ratio: 16 / 9;
+  max-height: 200px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--color-neutral-light);
+}
+.sede-mapa__frame iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+/* En celular el mapa va debajo del texto y no rompe el ancho de la pantalla. */
+@media (max-width: 680px) {
+  .sede-mapa { grid-template-columns: minmax(0, 1fr); }
+  .sede-mapa__frame { max-width: none; margin-left: 0; aspect-ratio: 16 / 11; max-height: none; }
+  .btn-mapa { width: 100%; justify-content: center; }
+}
+
+/* Nota aclaratoria dentro de una pestaña del panel */
+.tab-intro--nota {
+  background: var(--color-primary-light);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: var(--color-primary-dark);
+}

@@ -3,6 +3,10 @@
 // ============================================
 // Crea una cuenta de TRABAJADOR. Solo puede llamarla un administrador.
 //
+// El cuerpo acepta sede_id con una sede concreta, o null para un trabajador que
+// cubre TODAS las sedes (así lo guarda perfiles.sede_id y así lo leen las
+// políticas RLS de horarios_disponibles).
+//
 // Por qué existe: crear usuarios en Supabase Auth requiere la service_role key,
 // que jamás puede estar en el frontend (el repositorio es público). Esta función
 // vive en el servidor, valida que quien llama sea admin, y recién ahí usa la key.
@@ -62,17 +66,25 @@ Deno.serve(async (req) => {
   }
 
   // ---- 3. Validar los datos recibidos ----
-  let body: Record<string, string>;
+  // `unknown` y no `string`: sede_id puede llegar como null, que es un valor
+  // legítimo y significa "cubre todas las sedes".
+  let body: Record<string, unknown>;
   try {
     body = await req.json();
   } catch {
     return json({ error: "Cuerpo inválido." }, 400);
   }
 
-  const email = (body.email ?? "").trim().toLowerCase();
-  const password = body.password ?? "";
-  const nombre = (body.nombre ?? "").trim();
-  const sedeId = (body.sede_id ?? "").trim();
+  const texto = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+
+  const email = texto(body.email).toLowerCase();
+  const password = typeof body.password === "string" ? body.password : "";
+  const nombre = texto(body.nombre);
+
+  // Convención de la base: perfiles.sede_id NULL = el trabajador cubre TODAS
+  // las sedes. Un sede_id ausente o null llega aquí como "" y significa eso.
+  const sedeId = texto(body.sede_id);
+  const cubreTodasLasSedes = sedeId === "";
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return json({ error: "Correo electrónico inválido." }, 400);
@@ -80,16 +92,16 @@ Deno.serve(async (req) => {
   if (password.length < 8) {
     return json({ error: "La contraseña debe tener al menos 8 caracteres." }, 400);
   }
-  if (!sedeId) {
-    return json({ error: "Debes asignarle una sede al trabajador." }, 400);
-  }
 
-  const { data: sede } = await admin
-    .from("sedes")
-    .select("id")
-    .eq("id", sedeId)
-    .maybeSingle();
-  if (!sede) return json({ error: "La sede indicada no existe." }, 400);
+  // Si eligió una sede concreta, sigue teniendo que existir.
+  if (!cubreTodasLasSedes) {
+    const { data: sede } = await admin
+      .from("sedes")
+      .select("id")
+      .eq("id", sedeId)
+      .maybeSingle();
+    if (!sede) return json({ error: "La sede indicada no existe." }, 400);
+  }
 
   // ---- 4. Crear el usuario en Auth ----
   const { data: creado, error: errCrear } = await admin.auth.admin.createUser({
@@ -113,7 +125,7 @@ Deno.serve(async (req) => {
     email,
     nombre: nombre || email,
     rol: "trabajador",
-    sede_id: sedeId,
+    sede_id: cubreTodasLasSedes ? null : sedeId,
     activo: true,
   });
 

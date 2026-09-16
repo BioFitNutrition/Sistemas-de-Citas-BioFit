@@ -21,6 +21,11 @@ export function showView(viewId) {
   const topbarBack = document.getElementById("btn-topbar-back");
   if (topbarBack) topbarBack.classList.toggle("hidden", viewId !== "view-admin-login");
 
+  // Dentro del panel, "Team Enterprise" sobra: el usuario ya entró. Ahí arriba
+  // solo tiene sentido "Cerrar sesión", que vive en la cabecera del panel.
+  const topbarLogin = document.getElementById("btn-admin-login");
+  if (topbarLogin) topbarLogin.classList.toggle("hidden", viewId === "view-panel");
+
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -139,6 +144,26 @@ export function setLoading(button, loading, loadingText) {
       delete button.dataset.originalText;
     }
   }
+}
+
+// ---------- Ojito de las contraseñas ----------
+// Cada campo de contraseña lleva al lado un botón [data-pwd-toggle] que alterna
+// entre `password` y `text`. Se engancha una sola vez al arrancar, y sirve para
+// todos los campos que existan en el HTML (login y alta de trabajadores).
+
+export function initTogglesPassword() {
+  document.querySelectorAll("[data-pwd-toggle]").forEach((btn) => {
+    const input = btn.parentElement?.querySelector("input");
+    if (!input) return;
+
+    btn.addEventListener("click", () => {
+      const estabaVisible = input.type === "text";
+      input.type = estabaVisible ? "password" : "text";
+      btn.classList.toggle("is-on", !estabaVisible);
+      btn.setAttribute("aria-pressed", String(!estabaVisible));
+      btn.setAttribute("aria-label", estabaVisible ? "Mostrar contraseña" : "Ocultar contraseña");
+    });
+  });
 }
 
 export function emailValido(email) {

@@ -2,7 +2,7 @@
 // Punto de entrada
 // ============================================
 
-import { showView, showToast, setLoading } from "./utils.js";
+import { showView, showToast, setLoading, initTogglesPassword } from "./utils.js";
 import { cargarSedes } from "./sedes.js";
 import { cargarPerfil, iniciarSesion, cerrarSesion, esAdmin } from "./auth.js";
 import { initClientFlow } from "./client.js";
@@ -17,6 +17,7 @@ async function arrancar() {
   // tanto el flujo público como el panel interno.
   await cargarSedes();
 
+  initTogglesPassword();
   initClientFlow();
   initPanel();
   initUsuarios();

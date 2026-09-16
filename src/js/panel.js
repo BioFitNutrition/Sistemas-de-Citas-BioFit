@@ -15,6 +15,13 @@ import { llenarSelectSedes, chipSede, nombreSede } from "./sedes.js";
 let realtimeChannel = null;
 let trabajadores = [];   // cache para los selects de delegación (solo admin)
 
+// Sede a la que el usuario está amarrado, o null si puede elegir entre todas.
+// El admin siempre puede. El trabajador solo si su perfil tiene sede_id NULL,
+// que es la convención de la base para "cubre todas las sedes".
+function sedeFija() {
+  return esTrabajador() ? miSede() : null;
+}
+
 // ---------- arranque ----------
 
 export function initPanel() {
@@ -44,21 +51,37 @@ export async function entrarAlPanel() {
     el.classList.toggle("hidden", !esAdmin());
   });
 
-  // Filtros de sede: el admin ve todas; el trabajador queda fijo en la suya
-  const opciones = esAdmin()
-    ? { incluirTodas: true }
-    : { incluirTodas: false, soloSede: miSede() };
+  const miSedeFija = sedeFija();
 
-  llenarSelectSedes(document.getElementById("filtro-sede-citas"), opciones);
-  llenarSelectSedes(document.getElementById("filtro-sede-horarios"), opciones);
+  // CITAS: nunca se filtran por sede para el trabajador. Sus citas son las que
+  // el admin le delegó, y pueden ser de CUALQUIER sede — su `sede_id` solo dice
+  // qué horarios gestiona, no dónde puede atender. Filtrar aquí le escondía las
+  // citas de la otra sede (el bug del punto 1 de TAREAS.md). RLS ya garantiza
+  // que solo reciba las suyas: el filtro no protegía nada.
+  llenarSelectSedes(document.getElementById("filtro-sede-citas"), { incluirTodas: true });
+  document
+    .querySelector("#tab-citas .filter-row__sede")
+    .classList.toggle("hidden", esTrabajador());
+
+  // HORARIOS: aquí el filtro por sede sí tiene sentido y se queda. Quien tiene
+  // una sede fija queda amarrado a ella; el admin y el trabajador que cubre
+  // todas pueden alternar entre las dos.
+  const opcionesHorarios = miSedeFija
+    ? { incluirTodas: false, soloSede: miSedeFija }
+    : { incluirTodas: true };
+
+  llenarSelectSedes(document.getElementById("filtro-sede-horarios"), opcionesHorarios);
   llenarSelectSedes(document.getElementById("nuevo-horario-sede"), {
     incluirTodas: false,
-    soloSede: esAdmin() ? null : miSede(),
+    soloSede: miSedeFija,
   });
 
-  // Al trabajador no le sirve un selector con una sola opción
-  document.querySelectorAll(".filter-row__sede").forEach((el) => {
-    el.classList.toggle("hidden", esTrabajador());
+  // Un selector de una sola opción no le sirve a nadie: se oculta únicamente a
+  // quien tiene sede fija. Ojo: `.filter-row__sede` también envuelve el selector
+  // del formulario de agregar horario, que es justo el que el trabajador de
+  // ambas sedes necesita ver para elegir dónde crea el horario.
+  document.querySelectorAll("#tab-horarios .filter-row__sede").forEach((el) => {
+    el.classList.toggle("hidden", Boolean(miSedeFija));
   });
 
   if (esAdmin()) await cargarTrabajadores();
@@ -116,7 +139,11 @@ export async function cargarCitas() {
   const listEl = document.getElementById("citas-list");
   listEl.innerHTML = '<p class="loading">Cargando citas...</p>';
 
-  const filtro = document.getElementById("filtro-sede-citas").value;
+  // El trabajador ve TODAS sus citas asignadas, sin importar la sede: su filtro
+  // está oculto y aquí se ignora a propósito. RLS ya limita la lista a las suyas.
+  const filtro = esTrabajador()
+    ? "todas"
+    : document.getElementById("filtro-sede-citas").value;
 
   let query = supabase
     .from("citas")
@@ -274,7 +301,9 @@ async function onAgregarHorario(e) {
   errorEl.classList.add("hidden");
 
   const fd = new FormData(form);
-  const sede = esAdmin() ? fd.get("sede") : miSede();
+  // Al trabajador con sede fija se le impone la suya. El admin y el trabajador
+  // que cubre ambas eligen en el formulario.
+  const sede = sedeFija() ?? fd.get("sede");
 
   const submitBtn = form.querySelector('button[type="submit"]');
   setLoading(submitBtn, true, "Agregando...");
@@ -315,7 +344,11 @@ export async function cargarHorarios() {
     .order("hora", { ascending: true });
 
   if (filtro && filtro !== "todas") query = query.eq("sede_id", filtro);
-  if (esTrabajador()) query = query.eq("sede_id", miSede());
+
+  // Solo se fuerza la sede si el trabajador tiene una. Si cubre todas, su
+  // sede_id es NULL y un .eq("sede_id", null) rompería la consulta.
+  const miSedeFija = sedeFija();
+  if (miSedeFija) query = query.eq("sede_id", miSedeFija);
 
   const { data: horarios, error } = await query;
 

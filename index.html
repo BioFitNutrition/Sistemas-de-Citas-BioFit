@@ -776,6 +776,163 @@ body {
   .select-asignar { max-width: 100%; flex: 1; }
 }
 
+/* ============================================
+   BOTONES DE SESIÓN — "Team Enterprise" y "Cerrar sesión"
+   Antes eran links planos y se veían pobres al lado del resto de la interfaz.
+   Mismo lenguaje de botón para los dos, con la paleta de marca.
+   ============================================ */
+
+.btn-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.btn-pill:active { transform: scale(0.97); }
+.btn-pill__ico { flex-shrink: 0; }
+
+/* Sobre el header negro: contorno crema que al pasar el mouse se llena de teal. */
+.btn-pill--ghost {
+  background: rgba(212, 203, 185, 0.08);
+  border-color: rgba(212, 203, 185, 0.35);
+  color: var(--color-brand-cream);
+}
+.btn-pill--ghost:hover {
+  background: var(--color-brand-teal);
+  border-color: var(--color-brand-teal);
+  color: var(--color-header-bg);
+}
+
+/* Cerrar sesión: contorno neutro que se vuelve rojo al pasar el mouse, para
+   que se lea como una salida sin gritar en reposo. */
+.btn-pill--salir {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text-muted);
+  box-shadow: var(--shadow);
+}
+.btn-pill--salir:hover {
+  background: var(--color-danger-light);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+/* ============================================
+   OJITO DE LAS CONTRASEÑAS
+   ============================================ */
+
+.pwd-field { position: relative; display: flex; width: 100%; }
+.pwd-field input { width: 100%; padding-right: 42px; }
+
+.pwd-toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.pwd-toggle:hover { color: var(--color-primary); background: var(--color-primary-light); }
+.pwd-toggle:focus-visible { outline: 2px solid var(--color-primary); }
+.pwd-toggle.is-on { color: var(--color-primary); }
+
+/* Un solo ícono a la vez: ojo cerrado cuando la contraseña está a la vista. */
+.pwd-toggle .ico-ojo-off { display: none; }
+.pwd-toggle.is-on .ico-ojo { display: none; }
+.pwd-toggle.is-on .ico-ojo-off { display: inline-flex; }
+
+/* ============================================
+   MINI MAPA DE LA SEDE
+   Dirección + mapa + botón "Cómo llegar". Los datos salen de la tabla `sedes`.
+   El botón es el respaldo del iframe: si el mapa no carga, igual se puede llegar.
+   ============================================ */
+
+.sede-mapa {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 18px;
+  align-items: center;
+  margin: 16px 0 4px;
+  padding: 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--sede-color, var(--color-primary));
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.sede-mapa__info { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.sede-mapa__nombre { font-size: 1rem; }
+.sede-mapa__dir { color: var(--color-text-muted); font-size: 0.88rem; line-height: 1.4; }
+
+.btn-mapa {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 6px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.btn-mapa:hover { background: var(--color-primary-dark); }
+
+/* "Mini" mapa: acotado a propósito para que ubique la sede sin empujar los
+   horarios fuera de la pantalla — lo que el socio viene a hacer es reservar. */
+.sede-mapa__frame {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+  margin-left: auto;
+  aspect-ratio: 16 / 9;
+  max-height: 200px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--color-neutral-light);
+}
+.sede-mapa__frame iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+/* En celular el mapa va debajo del texto y no rompe el ancho de la pantalla. */
+@media (max-width: 680px) {
+  .sede-mapa { grid-template-columns: minmax(0, 1fr); }
+  .sede-mapa__frame { max-width: none; margin-left: 0; aspect-ratio: 16 / 11; max-height: none; }
+  .btn-mapa { width: 100%; justify-content: center; }
+}
+
+/* Nota aclaratoria dentro de una pestaña del panel */
+.tab-intro--nota {
+  background: var(--color-primary-light);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: var(--color-primary-dark);
+}
+
 </style>
 </head>
 <body>
@@ -786,7 +943,10 @@ body {
   </div>
   <div class="topbar__actions">
     <button id="btn-topbar-back" class="link-btn hidden">← Volver</button>
-    <button id="btn-admin-login" class="link-btn">Admin</button>
+    <button id="btn-admin-login" class="btn-pill btn-pill--ghost">
+      <svg class="btn-pill__ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3 4 6v5c0 4.5 3.2 8.6 8 10 4.8-1.4 8-5.5 8-10V6l-8-3Z"/></svg>
+      <span>Team Enterprise</span>
+    </button>
   </div>
 </header>
 
@@ -826,6 +986,20 @@ body {
         </span>
       </div>
     </div>
+
+    <section id="sede-mapa" class="sede-mapa hidden" aria-label="Ubicación de la sede">
+      <div class="sede-mapa__info">
+        <strong class="sede-mapa__nombre" id="sede-mapa-nombre"></strong>
+        <small class="sede-mapa__dir" id="sede-mapa-dir"></small>
+        <a id="sede-mapa-link" class="btn-mapa hidden" target="_blank" rel="noopener noreferrer">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 11l18-8-8 18-2-8-8-2Z"/></svg>
+          Cómo llegar
+        </a>
+      </div>
+      <div class="sede-mapa__frame hidden" id="sede-mapa-frame-wrap">
+        <iframe id="sede-mapa-frame" title="Mapa de la sede" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+      </div>
+    </section>
 
     <p id="calendario-loading" class="loading">Cargando horarios...</p>
     <p id="calendario-empty" class="empty-state hidden">No hay horarios disponibles por ahora. Vuelve a intentarlo más tarde.</p>
@@ -938,7 +1112,13 @@ body {
               <input required type="email" name="email" autocomplete="username" placeholder="tucorreo@biofit.pe" />
             </label>
             <label>Contraseña
-              <input required type="password" name="password" autocomplete="current-password" placeholder="••••••••" />
+              <span class="pwd-field">
+                <input required type="password" name="password" autocomplete="current-password" placeholder="••••••••" />
+                <button type="button" class="pwd-toggle" data-pwd-toggle aria-label="Mostrar contraseña" aria-pressed="false">
+                  <svg class="ico-ojo" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="2.8"/></svg>
+                  <svg class="ico-ojo-off" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5c1.9 0 3.5.6 4.9 1.4M22 12s-3.6 6.5-10 6.5c-1.9 0-3.5-.6-4.9-1.4"/><path d="M4 4l16 16"/></svg>
+                </button>
+              </span>
             </label>
             <button type="submit" class="btn-primary btn-block">Ingresar</button>
             <p id="login-error" class="error-text hidden"></p>
@@ -959,7 +1139,10 @@ body {
           <span id="panel-rol" class="badge"></span>
         </p>
       </div>
-      <button id="btn-logout" class="link-btn">Cerrar sesión</button>
+      <button id="btn-logout" class="btn-pill btn-pill--salir">
+        <svg class="btn-pill__ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 17l5-5-5-5M20 12H9M11 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5"/></svg>
+        <span>Cerrar sesión</span>
+      </button>
     </div>
 
     <div class="tabs">
@@ -1011,6 +1194,7 @@ body {
     <!-- ---- Tab: Usuarios (solo admin) ---- -->
     <div id="tab-usuarios" class="tab-panel hidden" data-solo-admin>
       <p class="tab-intro">Crea cuentas para tu equipo. Un trabajador solo ve las citas que le delegues y los horarios de su sede.</p>
+      <p class="tab-intro tab-intro--nota">La <strong>sede que gestiona</strong> define únicamente qué horarios puede crear y editar. Igual puede recibir citas de <strong>cualquier sede</strong>: las que le delegues las verá siempre, con el nombre de la sede a la vista.</p>
       <form id="form-nuevo-usuario" class="inline-form">
         <label>Nombre
           <input name="nombre" required placeholder="Nombre del trabajador" />
@@ -1019,9 +1203,15 @@ body {
           <input type="email" name="email" required placeholder="correo@ejemplo.com" />
         </label>
         <label>Contraseña
-          <input type="password" name="password" required minlength="8" placeholder="mín. 8 caracteres" />
+          <span class="pwd-field">
+            <input type="password" name="password" required minlength="8" placeholder="mín. 8 caracteres" />
+            <button type="button" class="pwd-toggle" data-pwd-toggle aria-label="Mostrar contraseña" aria-pressed="false">
+              <svg class="ico-ojo" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="2.8"/></svg>
+              <svg class="ico-ojo-off" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5c1.9 0 3.5.6 4.9 1.4M22 12s-3.6 6.5-10 6.5c-1.9 0-3.5-.6-4.9-1.4"/><path d="M4 4l16 16"/></svg>
+            </button>
+          </span>
         </label>
-        <label>Sede
+        <label>Sede que gestiona
           <select name="sede" id="nuevo-usuario-sede" required></select>
         </label>
         <button type="submit" class="btn-primary">Crear trabajador</button>
@@ -1119,6 +1309,11 @@ function showView(viewId) {
   // El botón "Volver" de la topbar solo aparece en la pantalla de login.
   const topbarBack = document.getElementById("btn-topbar-back");
   if (topbarBack) topbarBack.classList.toggle("hidden", viewId !== "view-admin-login");
+
+  // Dentro del panel, "Team Enterprise" sobra: el usuario ya entró. Ahí arriba
+  // solo tiene sentido "Cerrar sesión", que vive en la cabecera del panel.
+  const topbarLogin = document.getElementById("btn-admin-login");
+  if (topbarLogin) topbarLogin.classList.toggle("hidden", viewId === "view-panel");
 
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -1240,6 +1435,26 @@ function setLoading(button, loading, loadingText) {
   }
 }
 
+// ---------- Ojito de las contraseñas ----------
+// Cada campo de contraseña lleva al lado un botón [data-pwd-toggle] que alterna
+// entre `password` y `text`. Se engancha una sola vez al arrancar, y sirve para
+// todos los campos que existan en el HTML (login y alta de trabajadores).
+
+function initTogglesPassword() {
+  document.querySelectorAll("[data-pwd-toggle]").forEach((btn) => {
+    const input = btn.parentElement?.querySelector("input");
+    if (!input) return;
+
+    btn.addEventListener("click", () => {
+      const estabaVisible = input.type === "text";
+      input.type = estabaVisible ? "password" : "text";
+      btn.classList.toggle("is-on", !estabaVisible);
+      btn.setAttribute("aria-pressed", String(!estabaVisible));
+      btn.setAttribute("aria-label", estabaVisible ? "Mostrar contraseña" : "Ocultar contraseña");
+    });
+  });
+}
+
 function emailValido(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim());
 }
@@ -1249,9 +1464,10 @@ function emailValido(email) {
 // ============================================
 // Sedes — se leen de la BASE DE DATOS, no se hardcodean
 // ============================================
-// La tabla `sedes` trae nombre, direccion y color. El color es el requerimiento
-// de Luis: Magdalena verde, Jesús María amarillo. Si mañana quiere cambiarlo,
-// se cambia en la base y el frontend lo toma solo.
+// La tabla `sedes` trae nombre, direccion, color y los dos datos del mapa. El
+// color es el requerimiento de Luis: Magdalena verde, Jesús María amarillo. Si
+// mañana quiere cambiarlo —o si se muda de local— se cambia la fila en la base
+// y el frontend lo toma solo: aquí no se escribe ninguna dirección ni URL.
 
 
 
@@ -1261,7 +1477,7 @@ let _sedes = [];
 async function cargarSedes() {
   const { data, error } = await supabase
     .from("sedes")
-    .select("id, nombre, direccion, color")
+    .select("id, nombre, direccion, color, mapa_embed, maps_url")
     .order("nombre");
 
   if (error) {
@@ -1292,9 +1508,29 @@ function colorSede(sedeId) {
   return getSede(sedeId)?.color || COLOR_SEDE_DEFECTO;
 }
 
+// URL para el <iframe> del mini mapa. Formato `output=embed`, que funciona sin
+// API key — la Maps Embed API oficial exige cuenta de facturación con tarjeta y
+// este proyecto no puede tener eso. No cambiar por la API oficial.
+function mapaEmbedSede(sedeId) {
+  return getSede(sedeId)?.mapa_embed || "";
+}
+
+// URL del botón "Cómo llegar". Esta sí es API oficial y documentada de Google
+// (Maps URLs) y tampoco necesita key. Es el respaldo del iframe: si el mapa
+// algún día deja de cargar, el socio igual tiene cómo llegar.
+function mapsUrlSede(sedeId) {
+  return getSede(sedeId)?.maps_url || "";
+}
+
 // Pinta un <select> con las sedes disponibles.
-// `incluirTodas` agrega la opción "Todas" al inicio (solo tiene sentido para admin).
-function llenarSelectSedes(select, { incluirTodas = false, soloSede = null } = {}) {
+// `incluirTodas` agrega la opción "Todas" al inicio: sirve para FILTRAR una lista.
+// `incluirAmbas` agrega "Ambas sedes" al inicio: sirve para ELEGIR al crear algo
+//   (un correo que recibe los avisos de las dos sedes, un trabajador que cubre
+//   las dos). Son cosas distintas, por eso son dos opciones y no una.
+function llenarSelectSedes(
+  select,
+  { incluirTodas = false, incluirAmbas = false, soloSede = null } = {}
+) {
   if (!select) return;
   select.innerHTML = "";
 
@@ -1302,6 +1538,13 @@ function llenarSelectSedes(select, { incluirTodas = false, soloSede = null } = {
     const opt = document.createElement("option");
     opt.value = "todas";
     opt.textContent = "Todas";
+    select.appendChild(opt);
+  }
+
+  if (incluirAmbas) {
+    const opt = document.createElement("option");
+    opt.value = "ambas";
+    opt.textContent = "Ambas sedes";
     select.appendChild(opt);
   }
 
@@ -1321,6 +1564,16 @@ function chipSede(sedeId) {
   span.className = "chip-sede";
   span.textContent = nombreSede(sedeId);
   span.style.setProperty("--chip-color", colorSede(sedeId));
+  return span;
+}
+
+// Chip para quien no está atado a una sola sede (sede_id = NULL en la base).
+// No puede usar chipSede(null): no hay nombre ni color que leer.
+function chipAmbasSedes() {
+  const span = document.createElement("span");
+  span.className = "chip-sede";
+  span.textContent = "Ambas sedes";
+  span.style.setProperty("--chip-color", COLOR_SEDE_DEFECTO);
   return span;
 }
 
@@ -1515,8 +1768,49 @@ async function seleccionarSede(sedeId) {
   const head = document.querySelector(".gcal-head");
   if (head) head.style.setProperty("--sede-color", colorSede(sedeId));
 
+  renderMapaSede(sedeId);
+
   showView("view-calendario");
   await cargarDisponibilidad(sedeId);
+}
+
+// ---------- mini mapa de la sede ----------
+// Dirección, mapa y botón salen de la base (`sedes`), nunca del código.
+//
+// Son DOS mecanismos distintos a propósito: el iframe usa el formato
+// `output=embed`, que funciona sin API key pero no es una API documentada de
+// Google; el botón "Cómo llegar" usa Maps URLs, que sí es oficial y tampoco
+// necesita key. Si algún día el iframe deja de cargar, el botón sigue siendo
+// la garantía de que el socio pueda llegar. No cambiar por la Embed API
+// oficial: exige cuenta de facturación con tarjeta.
+
+function renderMapaSede(sedeId) {
+  const caja = document.getElementById("sede-mapa");
+  const marco = document.getElementById("sede-mapa-frame-wrap");
+  const iframe = document.getElementById("sede-mapa-frame");
+  const link = document.getElementById("sede-mapa-link");
+  const sede = getSede(sedeId) || {};
+
+  // El filete lateral toma el color de la sede, igual que el encabezado.
+  caja.style.setProperty("--sede-color", colorSede(sedeId));
+
+  document.getElementById("sede-mapa-nombre").textContent = sede.nombre || "";
+  document.getElementById("sede-mapa-dir").textContent = sede.direccion || "";
+
+  // Se limpia antes de pintar: si no, al cambiar de sede quedaría a la vista el
+  // mapa de la anterior mientras el nuevo carga.
+  iframe.removeAttribute("src");
+
+  const embed = mapaEmbedSede(sedeId);
+  marco.classList.toggle("hidden", !embed);
+  if (embed) iframe.src = embed;
+
+  const comoLlegar = mapsUrlSede(sedeId);
+  link.classList.toggle("hidden", !comoLlegar);
+  if (comoLlegar) link.href = comoLlegar;
+
+  // Si la sede no tuviera ni dirección ni mapa, la caja no aparece vacía.
+  caja.classList.toggle("hidden", !(sede.direccion || embed || comoLlegar));
 }
 
 // ---------- carga de disponibilidad ----------
@@ -1806,6 +2100,13 @@ function mostrarConfirmacion(horario, email) {
 let realtimeChannel = null;
 let trabajadores = [];   // cache para los selects de delegación (solo admin)
 
+// Sede a la que el usuario está amarrado, o null si puede elegir entre todas.
+// El admin siempre puede. El trabajador solo si su perfil tiene sede_id NULL,
+// que es la convención de la base para "cubre todas las sedes".
+function sedeFija() {
+  return esTrabajador() ? miSede() : null;
+}
+
 // ---------- arranque ----------
 
 function initPanel() {
@@ -1835,21 +2136,37 @@ async function entrarAlPanel() {
     el.classList.toggle("hidden", !esAdmin());
   });
 
-  // Filtros de sede: el admin ve todas; el trabajador queda fijo en la suya
-  const opciones = esAdmin()
-    ? { incluirTodas: true }
-    : { incluirTodas: false, soloSede: miSede() };
+  const miSedeFija = sedeFija();
 
-  llenarSelectSedes(document.getElementById("filtro-sede-citas"), opciones);
-  llenarSelectSedes(document.getElementById("filtro-sede-horarios"), opciones);
+  // CITAS: nunca se filtran por sede para el trabajador. Sus citas son las que
+  // el admin le delegó, y pueden ser de CUALQUIER sede — su `sede_id` solo dice
+  // qué horarios gestiona, no dónde puede atender. Filtrar aquí le escondía las
+  // citas de la otra sede (el bug del punto 1 de TAREAS.md). RLS ya garantiza
+  // que solo reciba las suyas: el filtro no protegía nada.
+  llenarSelectSedes(document.getElementById("filtro-sede-citas"), { incluirTodas: true });
+  document
+    .querySelector("#tab-citas .filter-row__sede")
+    .classList.toggle("hidden", esTrabajador());
+
+  // HORARIOS: aquí el filtro por sede sí tiene sentido y se queda. Quien tiene
+  // una sede fija queda amarrado a ella; el admin y el trabajador que cubre
+  // todas pueden alternar entre las dos.
+  const opcionesHorarios = miSedeFija
+    ? { incluirTodas: false, soloSede: miSedeFija }
+    : { incluirTodas: true };
+
+  llenarSelectSedes(document.getElementById("filtro-sede-horarios"), opcionesHorarios);
   llenarSelectSedes(document.getElementById("nuevo-horario-sede"), {
     incluirTodas: false,
-    soloSede: esAdmin() ? null : miSede(),
+    soloSede: miSedeFija,
   });
 
-  // Al trabajador no le sirve un selector con una sola opción
-  document.querySelectorAll(".filter-row__sede").forEach((el) => {
-    el.classList.toggle("hidden", esTrabajador());
+  // Un selector de una sola opción no le sirve a nadie: se oculta únicamente a
+  // quien tiene sede fija. Ojo: `.filter-row__sede` también envuelve el selector
+  // del formulario de agregar horario, que es justo el que el trabajador de
+  // ambas sedes necesita ver para elegir dónde crea el horario.
+  document.querySelectorAll("#tab-horarios .filter-row__sede").forEach((el) => {
+    el.classList.toggle("hidden", Boolean(miSedeFija));
   });
 
   if (esAdmin()) await cargarTrabajadores();
@@ -1907,7 +2224,11 @@ async function cargarCitas() {
   const listEl = document.getElementById("citas-list");
   listEl.innerHTML = '<p class="loading">Cargando citas...</p>';
 
-  const filtro = document.getElementById("filtro-sede-citas").value;
+  // El trabajador ve TODAS sus citas asignadas, sin importar la sede: su filtro
+  // está oculto y aquí se ignora a propósito. RLS ya limita la lista a las suyas.
+  const filtro = esTrabajador()
+    ? "todas"
+    : document.getElementById("filtro-sede-citas").value;
 
   let query = supabase
     .from("citas")
@@ -2065,7 +2386,9 @@ async function onAgregarHorario(e) {
   errorEl.classList.add("hidden");
 
   const fd = new FormData(form);
-  const sede = esAdmin() ? fd.get("sede") : miSede();
+  // Al trabajador con sede fija se le impone la suya. El admin y el trabajador
+  // que cubre ambas eligen en el formulario.
+  const sede = sedeFija() ?? fd.get("sede");
 
   const submitBtn = form.querySelector('button[type="submit"]');
   setLoading(submitBtn, true, "Agregando...");
@@ -2106,7 +2429,11 @@ async function cargarHorarios() {
     .order("hora", { ascending: true });
 
   if (filtro && filtro !== "todas") query = query.eq("sede_id", filtro);
-  if (esTrabajador()) query = query.eq("sede_id", miSede());
+
+  // Solo se fuerza la sede si el trabajador tiene una. Si cubre todas, su
+  // sede_id es NULL y un .eq("sede_id", null) rompería la consulta.
+  const miSedeFija = sedeFija();
+  if (miSedeFija) query = query.eq("sede_id", miSedeFija);
 
   const { data: horarios, error } = await query;
 
@@ -2251,7 +2578,10 @@ function initUsuarios() {
 
 async function prepararUsuarios() {
   if (!esAdmin()) return;
-  llenarSelectSedes(document.getElementById("nuevo-usuario-sede"), { incluirTodas: false });
+  llenarSelectSedes(document.getElementById("nuevo-usuario-sede"), {
+    incluirTodas: false,
+    incluirAmbas: true,
+  });
   await cargarUsuarios();
 }
 
@@ -2299,7 +2629,13 @@ function renderUsuario(u) {
   rol.textContent = u.rol === "admin" ? "Administrador" : "Trabajador";
   chips.appendChild(rol);
 
-  if (u.sede_id) chips.appendChild(chipSede(u.sede_id));
+  // sede_id NULL = cubre todas las sedes. En el admin no se muestra: por
+  // definición ve todo, y el chip solo sería ruido.
+  if (u.sede_id) {
+    chips.appendChild(chipSede(u.sede_id));
+  } else if (u.rol !== "admin") {
+    chips.appendChild(chipAmbasSedes());
+  }
   info.appendChild(chips);
 
   const acciones = document.createElement("div");
@@ -2344,11 +2680,13 @@ async function onCrearUsuario(e) {
   errorEl.classList.add("hidden");
 
   const fd = new FormData(form);
+  const sede = fd.get("sede");
   const payload = {
     email: fd.get("email").trim(),
     password: fd.get("password"),
     nombre: fd.get("nombre").trim(),
-    sede_id: fd.get("sede"),
+    // "ambas" viaja como null: es la convención de la base para "todas las sedes".
+    sede_id: sede === "ambas" ? null : sede,
   };
 
   if (payload.password.length < 8) {
@@ -2414,7 +2752,10 @@ function initNotificaciones() {
 
 async function prepararNotificaciones() {
   if (!esAdmin()) return;
-  llenarSelectSedes(document.getElementById("nueva-notificacion-sede"), { incluirTodas: false });
+  llenarSelectSedes(document.getElementById("nueva-notificacion-sede"), {
+    incluirTodas: false,
+    incluirAmbas: true,
+  });
   await cargarNotificaciones();
 }
 
@@ -2501,28 +2842,79 @@ async function onAgregarCorreo(e) {
     return;
   }
 
+  // "ambas" no es una sede: es el atajo para no tener que agregar el mismo
+  // correo una vez por sede. Se expande a las sedes que haya en la base.
+  const eligioAmbas = fd.get("sede") === "ambas";
+  const destinos = eligioAmbas ? getSedes().map((s) => s.id) : [fd.get("sede")];
+
+  if (destinos.length === 0) {
+    errorEl.textContent = "No se pudieron leer las sedes. Recarga la página.";
+    errorEl.classList.remove("hidden");
+    return;
+  }
+
   const submitBtn = form.querySelector('button[type="submit"]');
   setLoading(submitBtn, true, "Agregando...");
 
-  const { error } = await supabase.from("notificaciones_sede").insert({
-    sede_id: fd.get("sede"),
-    email,
-  });
+  // Una fila por sede, cada una en su propio insert. En un solo insert con
+  // varias filas, Postgres ejecuta todo como una sentencia atómica: si el
+  // correo ya existe en una sede, el choque con la restricción única
+  // (sede_id, email) tumbaría también la inserción de la otra.
+  const resultados = await Promise.all(
+    destinos.map(async (sedeId) => {
+      const { error } = await supabase
+        .from("notificaciones_sede")
+        .insert({ sede_id: sedeId, email });
+      return { sedeId, error };
+    })
+  );
 
   setLoading(submitBtn, false);
 
-  if (error) {
-    errorEl.textContent = error.code === "23505"
-      ? "Ese correo ya está configurado para esta sede."
-      : "No se pudo agregar el correo.";
+  const agregadas = resultados.filter((r) => !r.error).map((r) => r.sedeId);
+  const yaEstaban = resultados.filter((r) => r.error?.code === "23505").map((r) => r.sedeId);
+  const fallaron = resultados.filter((r) => r.error && r.error.code !== "23505");
+
+  // Un fallo real (permisos, red) sí es un error rojo, aunque otra sede haya entrado.
+  if (fallaron.length > 0) {
+    errorEl.textContent = "No se pudo agregar el correo.";
     errorEl.classList.remove("hidden");
-    console.error(error);
+    fallaron.forEach((r) => console.error(r.error));
+    if (agregadas.length > 0) cargarNotificaciones();
+    return;
+  }
+
+  // Nada que insertar porque ya estaba en todas: es un aviso, no un error.
+  if (agregadas.length === 0) {
+    if (eligioAmbas) {
+      showToast("Ese correo ya estaba en todas las sedes.");
+    } else {
+      errorEl.textContent = "Ese correo ya está configurado para esta sede.";
+      errorEl.classList.remove("hidden");
+    }
     return;
   }
 
   form.reset();
-  showToast("Correo agregado.");
+
+  let mensaje;
+  if (yaEstaban.length > 0) {
+    mensaje = `Agregado a ${listarSedes(agregadas)} (ya estaba en ${listarSedes(yaEstaban)}).`;
+  } else if (eligioAmbas) {
+    mensaje = `Correo agregado a ${listarSedes(agregadas)}.`;
+  } else {
+    mensaje = "Correo agregado.";
+  }
+  showToast(mensaje);
+
   cargarNotificaciones();
+}
+
+// "Magdalena", "Magdalena y Jesús María", "A, B y C"
+function listarSedes(ids) {
+  const nombres = ids.map(nombreSede);
+  if (nombres.length <= 1) return nombres.join("");
+  return `${nombres.slice(0, -1).join(", ")} y ${nombres[nombres.length - 1]}`;
 }
 
 async function alternarCorreo(id, activo) {
@@ -2569,6 +2961,7 @@ async function arrancar() {
   // tanto el flujo público como el panel interno.
   await cargarSedes();
 
+  initTogglesPassword();
   initClientFlow();
   initPanel();
   initUsuarios();

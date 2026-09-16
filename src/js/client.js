@@ -11,7 +11,7 @@ import {
   hoy0, capitalizar, formatearFecha, rangoHora, hhmm12, toMin,
   setLoading, emailValido,
 } from "./utils.js";
-import { getSedes, getSede, colorSede } from "./sedes.js";
+import { getSedes, getSede, colorSede, mapaEmbedSede, mapsUrlSede } from "./sedes.js";
 
 const state = {
   sedeId: null,
@@ -106,8 +106,49 @@ async function seleccionarSede(sedeId) {
   const head = document.querySelector(".gcal-head");
   if (head) head.style.setProperty("--sede-color", colorSede(sedeId));
 
+  renderMapaSede(sedeId);
+
   showView("view-calendario");
   await cargarDisponibilidad(sedeId);
+}
+
+// ---------- mini mapa de la sede ----------
+// Dirección, mapa y botón salen de la base (`sedes`), nunca del código.
+//
+// Son DOS mecanismos distintos a propósito: el iframe usa el formato
+// `output=embed`, que funciona sin API key pero no es una API documentada de
+// Google; el botón "Cómo llegar" usa Maps URLs, que sí es oficial y tampoco
+// necesita key. Si algún día el iframe deja de cargar, el botón sigue siendo
+// la garantía de que el socio pueda llegar. No cambiar por la Embed API
+// oficial: exige cuenta de facturación con tarjeta.
+
+function renderMapaSede(sedeId) {
+  const caja = document.getElementById("sede-mapa");
+  const marco = document.getElementById("sede-mapa-frame-wrap");
+  const iframe = document.getElementById("sede-mapa-frame");
+  const link = document.getElementById("sede-mapa-link");
+  const sede = getSede(sedeId) || {};
+
+  // El filete lateral toma el color de la sede, igual que el encabezado.
+  caja.style.setProperty("--sede-color", colorSede(sedeId));
+
+  document.getElementById("sede-mapa-nombre").textContent = sede.nombre || "";
+  document.getElementById("sede-mapa-dir").textContent = sede.direccion || "";
+
+  // Se limpia antes de pintar: si no, al cambiar de sede quedaría a la vista el
+  // mapa de la anterior mientras el nuevo carga.
+  iframe.removeAttribute("src");
+
+  const embed = mapaEmbedSede(sedeId);
+  marco.classList.toggle("hidden", !embed);
+  if (embed) iframe.src = embed;
+
+  const comoLlegar = mapsUrlSede(sedeId);
+  link.classList.toggle("hidden", !comoLlegar);
+  if (comoLlegar) link.href = comoLlegar;
+
+  // Si la sede no tuviera ni dirección ni mapa, la caja no aparece vacía.
+  caja.classList.toggle("hidden", !(sede.direccion || embed || comoLlegar));
 }
 
 // ---------- carga de disponibilidad ----------

@@ -1,14 +1,17 @@
 -- ============================================================
 -- BIOFIT — Esquema de base de datos (Supabase)
 -- ============================================================
--- ⚠️  DOCUMENTACIÓN, NO EJECUTAR.
+-- ⚠️⚠️  DOCUMENTACIÓN DESACTUALIZADA. NO EJECUTAR. NO USAR COMO FUENTE DE VERDAD.
 --
--- Este archivo refleja el estado REAL de la base en producción
--- (proyecto snuefzvfhucgfllnifat), ya migrada y verificada.
--- Sirve como referencia y como respaldo para reconstruir el esquema
--- desde cero si alguna vez hiciera falta.
+-- La base real (proyecto snuefzvfhucgfllnifat) tiene cambios que este archivo
+-- NO refleja. Entre otros: las columnas `sedes.mapa_embed` y `sedes.maps_url`,
+-- las direcciones reales, las tildes de "Jesús María", y los triggers de correo
+-- (trg_notificar_cita_nueva, trg_notificar_cita_delegada).
 --
--- Última actualización: 15/09/2026
+-- El contrato vigente de la base está en CLAUDE.md. Si hace falta el esquema
+-- exacto, consultarlo contra la base, no contra este archivo.
+--
+-- Última actualización: 15/09/2026 (parcial)
 -- ============================================================
 
 

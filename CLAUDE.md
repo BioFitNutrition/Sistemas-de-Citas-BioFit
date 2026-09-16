@@ -1,5 +1,18 @@
 # BioFit — Sistema de Citas
 
+# 🛑 ANTES DE HACER NADA: LEE `ESTADO.md`
+
+**Obligatorio, sin excepciones, en cada sesión.** `ESTADO.md` dice en qué punto
+está el proyecto HOY, qué se cambió por última vez y qué toca ahora. Este archivo
+(`CLAUDE.md`) es contexto permanente: cambia poco. `ESTADO.md` cambia siempre.
+
+**Al terminar CUALQUIER cambio, regenera `ESTADO.md` completo** — reescrito de
+cero, nunca agregando abajo. Es el último paso de todo trabajo, no es opcional.
+Christopher mueve ese archivo entre Claude Code y el chat de Claude: si queda
+desactualizado, el otro lado trabaja con información falsa.
+
+---
+
 > Archivo de contexto permanente del proyecto. Claude Code lo lee automáticamente
 > al abrir el repositorio. Mantenerlo actualizado cuando cambie algo estructural.
 >
@@ -61,11 +74,32 @@ con un límite de ~500 correos/día (de sobra para este volumen).
 | Columna | Tipo | Notas |
 |---|---|---|
 | `id` | text PK | `magdalena` \| `jesus_maria` |
-| `nombre` | text | nombre visible de la sede |
-| `direccion` | text | ubicación (gimnasios XFLY) |
+| `nombre` | text | `Sede Magdalena del Mar` · `Sede Jesús María` |
+| `direccion` | text | dirección de calle real |
 | `color` | text | `#16a34a` verde (Magdalena) · `#eab308` amarillo (Jesús María) |
+| `mapa_embed` | text | URL para el `<iframe>` del mini mapa |
+| `maps_url` | text | link para el botón "Cómo llegar" |
 
-El color se lee **de la base**, no se hardcodea en el frontend.
+**Todo esto se lee de la base, nunca se hardcodea en el frontend.** Si Luis se
+muda de local, se cambia la fila y listo — no se toca código ni se hace deploy.
+
+Valores reales hoy:
+
+| | Magdalena | Jesús María |
+|---|---|---|
+| Dirección | Av. del Ejército 1360, Magdalena del Mar | Av. General Garzón 1123, Jesús María |
+
+⚠️ **Los mapas NO usan API key de Google, a propósito.** La Maps Embed API oficial
+exige una cuenta de facturación con tarjeta, y este proyecto no puede tener eso.
+Se usan dos mecanismos sin key:
+
+- `mapa_embed` → `https://www.google.com/maps?q=LAT,LNG(Etiqueta)&hl=es&z=17&output=embed`
+- `maps_url` → `https://www.google.com/maps/dir/?api=1&destination=LAT,LNG`
+  (este sí es API oficial y documentada de Google: Maps URLs)
+
+**No reemplazar esto por la Embed API oficial.** Y el botón "Cómo llegar" no es
+un adorno: si algún día el iframe deja de funcionar, es el que garantiza que el
+socio igual pueda llegar.
 
 ### `horarios_disponibles`
 `id` uuid PK · `sede_id` → sedes · `fecha` date · `hora` time ·
@@ -124,26 +158,28 @@ si un trabajador no puede borrar, **no mostrarle el botón de borrar**.
 
 ---
 
-## Trampas conocidas del código actual
+## Trampas conocidas — YA CORREGIDAS, no reintroducirlas
 
-Dos bugs ya identificados. Corregirlos al modularizar:
+Estas dos ya están arregladas en `/src`. Están documentadas porque son fáciles de
+volver a romper sin darse cuenta:
 
-**1. Horarios ocupados mal calculados para el trabajador.**
-`cargarHorariosAdmin()` cruza `citas` para marcar qué slots están ocupados. Con RLS,
-un trabajador solo recibe *sus* citas, así que los horarios ocupados por citas de
-otros le aparecerían **libres** → riesgo de doble reserva.
-→ Derivar "ocupado" de `horarios_disponibles.disponible`, no de cruzar con `citas`.
+**1. Horarios ocupados: derivarlos de `disponible`, NUNCA de cruzar con `citas`.**
+Con RLS, un trabajador solo recibe *sus* citas. Si se calculara "ocupado" cruzando
+contra `citas`, los horarios tomados por citas de otros le aparecerían **libres**
+→ doble reserva. El estado ocupado sale de `horarios_disponibles.disponible`.
 
-**2. Fecha en UTC en vez de hora local.**
-`new Date().toISOString().slice(0, 10)` devuelve la fecha en UTC. En Perú (GMT−5),
-después de las 7 pm eso da *mañana*, y los horarios de hoy desaparecen del panel.
-→ Usar el helper `isoLocal()` que ya existe en el resto del archivo.
+**2. Fechas: siempre `isoLocal()`, NUNCA `toISOString().slice(0,10)`.**
+`toISOString()` devuelve la fecha en UTC. En Perú (GMT−5), después de las 7 pm eso
+da *mañana* y los horarios de hoy desaparecen del panel. El helper `isoLocal()`
+está en `utils.js`.
 
 ---
 
 ## Reglas de trabajo
 
-1. **No modificar la base de datos.** Ya está construida y verificada.
+1. **No modificar la base de datos por tu cuenta.** Ya está construida y verificada.
+   Hay UNA sola migración aprobada pendiente: agregar `citas.cancelada_por`
+   (ver `TAREAS.md` punto 7). Cualquier otra cosa, avisa antes.
 2. **No romper el diseño.** La interfaz ya fue aprobada por el cliente: calendario
    estilo Google Calendar, tarjeta de login con la marca, paleta BioFit.
 3. **Nunca poner la `service_role` key en el frontend.** El repositorio es público.
@@ -193,23 +229,24 @@ comparten un mismo ámbito. Dos funciones privadas con el mismo nombre en archiv
 distintos chocan. `build.py` detecta esas colisiones y aborta con un mensaje
 claro antes de generar nada.
 
-## Estado actual
+## El sistema está EN PRODUCCIÓN y funcionando
 
-**Hecho:**
-- Base de datos completa: 5 tablas, 18 políticas RLS por rol, 4 funciones helper,
-  2 triggers, todo verificado en producción
-- Luis ya existe en Auth (`biofit.consulting1@gmail.com`) con perfil y rol `admin`
-- 99 horarios cargados, 0 citas (base limpia de pruebas)
-- Repo creado con GitHub Pages activo y `.nojekyll` en su sitio
-- **Frontend modular completo y probado**: flujo del socio, panel por rol,
-  gestión de usuarios, configuración de correos, colores por sede
-- **Los dos bugs conocidos ya están corregidos** (ver sección anterior)
-- Código fuente de las dos Edge Functions escrito (`notify-cita`, `crear-usuario`)
+No es un prototipo. Está desplegado, con correos reales saliendo al Gmail de
+BioFit. Cualquier cambio tiene que respetar lo que ya anda:
 
-**Aún no existe:**
-- Ninguna Edge Function **desplegada**. El código está en el repo, pero falta
-  `supabase functions deploy` y configurar los Database Webhooks.
-- Ningún usuario con rol `trabajador`: falta crear el primero y probar el
-  aislamiento contra la base real.
+- Base de datos completa y verificada: 5 tablas, RLS por rol, 4 funciones helper,
+  4 triggers
+- Luis existe en Auth (`biofit.consulting1@gmail.com`) con rol `admin`
+- **Las dos Edge Functions están DESPLEGADAS y ACTIVAS** (`notify-cita`,
+  `crear-usuario`), con sus secretos y sus Database Webhooks configurados
+- **Los correos funcionan y están probados en producción**: aviso interno,
+  confirmación al socio, y aviso al trabajador cuando se le delega una cita
+- Frontend modular publicado en GitHub Pages
+- Existen 2 trabajadores de prueba en `perfiles`
 
-**Pendiente:** ver `TAREAS.md`
+⚠️ **`notify-cita` responde 200 de inmediato y manda el correo en segundo plano
+con `EdgeRuntime.waitUntil`. NO cambiar ese patrón.** Conectarse a Gmail tarda
+~6 s y quien la llama (pg_net) corta la espera a los 8 s: si respondiera al final,
+el corte mataría la ejecución antes de enviar. Ya pasó una vez.
+
+**Pendiente:** ver `TAREAS.md`. Lo que toca AHORA está en `ESTADO.md`.

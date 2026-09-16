@@ -7,7 +7,7 @@
 import { supabase } from "./supabaseClient.js";
 import { esAdmin } from "./auth.js";
 import { showToast, setLoading, emailValido } from "./utils.js";
-import { llenarSelectSedes, chipSede } from "./sedes.js";
+import { llenarSelectSedes, chipSede, getSedes, nombreSede } from "./sedes.js";
 
 export function initNotificaciones() {
   const form = document.getElementById("form-nueva-notificacion");
@@ -16,7 +16,10 @@ export function initNotificaciones() {
 
 export async function prepararNotificaciones() {
   if (!esAdmin()) return;
-  llenarSelectSedes(document.getElementById("nueva-notificacion-sede"), { incluirTodas: false });
+  llenarSelectSedes(document.getElementById("nueva-notificacion-sede"), {
+    incluirTodas: false,
+    incluirAmbas: true,
+  });
   await cargarNotificaciones();
 }
 
@@ -103,28 +106,79 @@ async function onAgregarCorreo(e) {
     return;
   }
 
+  // "ambas" no es una sede: es el atajo para no tener que agregar el mismo
+  // correo una vez por sede. Se expande a las sedes que haya en la base.
+  const eligioAmbas = fd.get("sede") === "ambas";
+  const destinos = eligioAmbas ? getSedes().map((s) => s.id) : [fd.get("sede")];
+
+  if (destinos.length === 0) {
+    errorEl.textContent = "No se pudieron leer las sedes. Recarga la página.";
+    errorEl.classList.remove("hidden");
+    return;
+  }
+
   const submitBtn = form.querySelector('button[type="submit"]');
   setLoading(submitBtn, true, "Agregando...");
 
-  const { error } = await supabase.from("notificaciones_sede").insert({
-    sede_id: fd.get("sede"),
-    email,
-  });
+  // Una fila por sede, cada una en su propio insert. En un solo insert con
+  // varias filas, Postgres ejecuta todo como una sentencia atómica: si el
+  // correo ya existe en una sede, el choque con la restricción única
+  // (sede_id, email) tumbaría también la inserción de la otra.
+  const resultados = await Promise.all(
+    destinos.map(async (sedeId) => {
+      const { error } = await supabase
+        .from("notificaciones_sede")
+        .insert({ sede_id: sedeId, email });
+      return { sedeId, error };
+    })
+  );
 
   setLoading(submitBtn, false);
 
-  if (error) {
-    errorEl.textContent = error.code === "23505"
-      ? "Ese correo ya está configurado para esta sede."
-      : "No se pudo agregar el correo.";
+  const agregadas = resultados.filter((r) => !r.error).map((r) => r.sedeId);
+  const yaEstaban = resultados.filter((r) => r.error?.code === "23505").map((r) => r.sedeId);
+  const fallaron = resultados.filter((r) => r.error && r.error.code !== "23505");
+
+  // Un fallo real (permisos, red) sí es un error rojo, aunque otra sede haya entrado.
+  if (fallaron.length > 0) {
+    errorEl.textContent = "No se pudo agregar el correo.";
     errorEl.classList.remove("hidden");
-    console.error(error);
+    fallaron.forEach((r) => console.error(r.error));
+    if (agregadas.length > 0) cargarNotificaciones();
+    return;
+  }
+
+  // Nada que insertar porque ya estaba en todas: es un aviso, no un error.
+  if (agregadas.length === 0) {
+    if (eligioAmbas) {
+      showToast("Ese correo ya estaba en todas las sedes.");
+    } else {
+      errorEl.textContent = "Ese correo ya está configurado para esta sede.";
+      errorEl.classList.remove("hidden");
+    }
     return;
   }
 
   form.reset();
-  showToast("Correo agregado.");
+
+  let mensaje;
+  if (yaEstaban.length > 0) {
+    mensaje = `Agregado a ${listarSedes(agregadas)} (ya estaba en ${listarSedes(yaEstaban)}).`;
+  } else if (eligioAmbas) {
+    mensaje = `Correo agregado a ${listarSedes(agregadas)}.`;
+  } else {
+    mensaje = "Correo agregado.";
+  }
+  showToast(mensaje);
+
   cargarNotificaciones();
+}
+
+// "Magdalena", "Magdalena y Jesús María", "A, B y C"
+function listarSedes(ids) {
+  const nombres = ids.map(nombreSede);
+  if (nombres.length <= 1) return nombres.join("");
+  return `${nombres.slice(0, -1).join(", ")} y ${nombres[nombres.length - 1]}`;
 }
 
 async function alternarCorreo(id, activo) {

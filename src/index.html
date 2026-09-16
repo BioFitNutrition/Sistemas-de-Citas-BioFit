@@ -16,7 +16,10 @@
   </div>
   <div class="topbar__actions">
     <button id="btn-topbar-back" class="link-btn hidden">← Volver</button>
-    <button id="btn-admin-login" class="link-btn">Admin</button>
+    <button id="btn-admin-login" class="btn-pill btn-pill--ghost">
+      <svg class="btn-pill__ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3 4 6v5c0 4.5 3.2 8.6 8 10 4.8-1.4 8-5.5 8-10V6l-8-3Z"/></svg>
+      <span>Team Enterprise</span>
+    </button>
   </div>
 </header>
 
@@ -56,6 +59,20 @@
         </span>
       </div>
     </div>
+
+    <section id="sede-mapa" class="sede-mapa hidden" aria-label="Ubicación de la sede">
+      <div class="sede-mapa__info">
+        <strong class="sede-mapa__nombre" id="sede-mapa-nombre"></strong>
+        <small class="sede-mapa__dir" id="sede-mapa-dir"></small>
+        <a id="sede-mapa-link" class="btn-mapa hidden" target="_blank" rel="noopener noreferrer">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 11l18-8-8 18-2-8-8-2Z"/></svg>
+          Cómo llegar
+        </a>
+      </div>
+      <div class="sede-mapa__frame hidden" id="sede-mapa-frame-wrap">
+        <iframe id="sede-mapa-frame" title="Mapa de la sede" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+      </div>
+    </section>
 
     <p id="calendario-loading" class="loading">Cargando horarios...</p>
     <p id="calendario-empty" class="empty-state hidden">No hay horarios disponibles por ahora. Vuelve a intentarlo más tarde.</p>
@@ -168,7 +185,13 @@
               <input required type="email" name="email" autocomplete="username" placeholder="tucorreo@biofit.pe" />
             </label>
             <label>Contraseña
-              <input required type="password" name="password" autocomplete="current-password" placeholder="••••••••" />
+              <span class="pwd-field">
+                <input required type="password" name="password" autocomplete="current-password" placeholder="••••••••" />
+                <button type="button" class="pwd-toggle" data-pwd-toggle aria-label="Mostrar contraseña" aria-pressed="false">
+                  <svg class="ico-ojo" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="2.8"/></svg>
+                  <svg class="ico-ojo-off" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5c1.9 0 3.5.6 4.9 1.4M22 12s-3.6 6.5-10 6.5c-1.9 0-3.5-.6-4.9-1.4"/><path d="M4 4l16 16"/></svg>
+                </button>
+              </span>
             </label>
             <button type="submit" class="btn-primary btn-block">Ingresar</button>
             <p id="login-error" class="error-text hidden"></p>
@@ -189,7 +212,10 @@
           <span id="panel-rol" class="badge"></span>
         </p>
       </div>
-      <button id="btn-logout" class="link-btn">Cerrar sesión</button>
+      <button id="btn-logout" class="btn-pill btn-pill--salir">
+        <svg class="btn-pill__ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 17l5-5-5-5M20 12H9M11 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5"/></svg>
+        <span>Cerrar sesión</span>
+      </button>
     </div>
 
     <div class="tabs">
@@ -241,6 +267,7 @@
     <!-- ---- Tab: Usuarios (solo admin) ---- -->
     <div id="tab-usuarios" class="tab-panel hidden" data-solo-admin>
       <p class="tab-intro">Crea cuentas para tu equipo. Un trabajador solo ve las citas que le delegues y los horarios de su sede.</p>
+      <p class="tab-intro tab-intro--nota">La <strong>sede que gestiona</strong> define únicamente qué horarios puede crear y editar. Igual puede recibir citas de <strong>cualquier sede</strong>: las que le delegues las verá siempre, con el nombre de la sede a la vista.</p>
       <form id="form-nuevo-usuario" class="inline-form">
         <label>Nombre
           <input name="nombre" required placeholder="Nombre del trabajador" />
@@ -249,9 +276,15 @@
           <input type="email" name="email" required placeholder="correo@ejemplo.com" />
         </label>
         <label>Contraseña
-          <input type="password" name="password" required minlength="8" placeholder="mín. 8 caracteres" />
+          <span class="pwd-field">
+            <input type="password" name="password" required minlength="8" placeholder="mín. 8 caracteres" />
+            <button type="button" class="pwd-toggle" data-pwd-toggle aria-label="Mostrar contraseña" aria-pressed="false">
+              <svg class="ico-ojo" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="2.8"/></svg>
+              <svg class="ico-ojo-off" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5c1.9 0 3.5.6 4.9 1.4M22 12s-3.6 6.5-10 6.5c-1.9 0-3.5-.6-4.9-1.4"/><path d="M4 4l16 16"/></svg>
+            </button>
+          </span>
         </label>
-        <label>Sede
+        <label>Sede que gestiona
           <select name="sede" id="nuevo-usuario-sede" required></select>
         </label>
         <button type="submit" class="btn-primary">Crear trabajador</button>

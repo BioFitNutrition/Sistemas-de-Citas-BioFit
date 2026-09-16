@@ -10,7 +10,7 @@ import { supabase } from "./supabaseClient.js";
 import { SUPABASE_URL } from "./config.js";
 import { esAdmin } from "./auth.js";
 import { showToast, escapeHtml, setLoading } from "./utils.js";
-import { llenarSelectSedes, nombreSede, chipSede } from "./sedes.js";
+import { llenarSelectSedes, nombreSede, chipSede, chipAmbasSedes } from "./sedes.js";
 import { refrescarTrabajadores, cargarCitas } from "./panel.js";
 
 export function initUsuarios() {
@@ -20,7 +20,10 @@ export function initUsuarios() {
 
 export async function prepararUsuarios() {
   if (!esAdmin()) return;
-  llenarSelectSedes(document.getElementById("nuevo-usuario-sede"), { incluirTodas: false });
+  llenarSelectSedes(document.getElementById("nuevo-usuario-sede"), {
+    incluirTodas: false,
+    incluirAmbas: true,
+  });
   await cargarUsuarios();
 }
 
@@ -68,7 +71,13 @@ function renderUsuario(u) {
   rol.textContent = u.rol === "admin" ? "Administrador" : "Trabajador";
   chips.appendChild(rol);
 
-  if (u.sede_id) chips.appendChild(chipSede(u.sede_id));
+  // sede_id NULL = cubre todas las sedes. En el admin no se muestra: por
+  // definición ve todo, y el chip solo sería ruido.
+  if (u.sede_id) {
+    chips.appendChild(chipSede(u.sede_id));
+  } else if (u.rol !== "admin") {
+    chips.appendChild(chipAmbasSedes());
+  }
   info.appendChild(chips);
 
   const acciones = document.createElement("div");
@@ -113,11 +122,13 @@ async function onCrearUsuario(e) {
   errorEl.classList.add("hidden");
 
   const fd = new FormData(form);
+  const sede = fd.get("sede");
   const payload = {
     email: fd.get("email").trim(),
     password: fd.get("password"),
     nombre: fd.get("nombre").trim(),
-    sede_id: fd.get("sede"),
+    // "ambas" viaja como null: es la convención de la base para "todas las sedes".
+    sede_id: sede === "ambas" ? null : sede,
   };
 
   if (payload.password.length < 8) {
