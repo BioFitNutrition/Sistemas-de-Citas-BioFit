@@ -16,7 +16,6 @@ import { llenarSelectSedes, chipSede, nombreSede } from "./sedes.js";
 import { DURACION_CITA_MIN } from "./config.js";
 
 let realtimeChannel = null;
-let trabajadores = [];   // cache para los selects de delegación (solo admin)
 let altaCal = null;      // calendario de alta de horarios (modo "varios")
 let seleccionHorarios = new Set();   // ids marcados para borrar en lote (admin)
 let diasAbiertos = new Set();        // "seccion|fecha" de los días desplegados
@@ -96,8 +95,6 @@ export async function entrarAlPanel() {
   // Refresca el recuento del alta con la sede que corresponda al rol.
   actualizarResumenAlta();
 
-  if (esAdmin()) await cargarTrabajadores();
-
   showView("view-panel");
   cambiarTab("citas");
   await Promise.all([cargarCitas(), cargarHorarios()]);
@@ -106,7 +103,6 @@ export async function entrarAlPanel() {
 
 export function salirDelPanel() {
   desactivarRealtime();
-  trabajadores = [];
 }
 
 function cambiarTab(tab) {
@@ -119,47 +115,21 @@ function cambiarTab(tab) {
   });
 }
 
-// ---------- trabajadores (para delegar) ----------
-
-async function cargarTrabajadores() {
-  const { data, error } = await supabase
-    .from("perfiles")
-    .select("id, nombre, email, sede_id, activo")
-    .eq("rol", "trabajador")
-    .eq("activo", true)
-    .order("nombre");
-
-  if (error) {
-    console.error("No se pudieron cargar los trabajadores:", error);
-    trabajadores = [];
-    return;
-  }
-  trabajadores = data || [];
-}
-
-export function getTrabajadores() {
-  return trabajadores;
-}
-
-export async function refrescarTrabajadores() {
-  if (esAdmin()) await cargarTrabajadores();
-}
-
 // ---------- CITAS ----------
 
 export async function cargarCitas() {
   const listEl = document.getElementById("citas-list");
   listEl.innerHTML = '<p class="loading">Cargando citas...</p>';
 
-  // El trabajador ve TODAS sus citas asignadas, sin importar la sede: su filtro
-  // está oculto y aquí se ignora a propósito. RLS ya limita la lista a las suyas.
+  // El trabajador ve las citas de SU SEDE, sin filtro propio: su selector está
+  // oculto y aquí se ignora a propósito. Quién ve qué lo decide RLS en la base.
   const filtro = esTrabajador()
     ? "todas"
     : document.getElementById("filtro-sede-citas").value;
 
   let query = supabase
     .from("citas")
-    .select("id, nombre_cliente, telefono_cliente, email_cliente, sede_id, fecha, hora, estado, asignado_a")
+    .select("id, nombre_cliente, telefono_cliente, email_cliente, sede_id, fecha, hora, estado")
     .order("fecha", { ascending: true })
     .order("hora", { ascending: true });
 
@@ -175,19 +145,79 @@ export async function cargarCitas() {
 
   if (!data || data.length === 0) {
     listEl.innerHTML = esTrabajador()
-      ? '<p class="empty-state">Todavía no te han asignado ninguna cita.</p>'
+      ? '<p class="empty-state">Todavía no hay citas en tu sede.</p>'
       : '<p class="empty-state">No hay citas registradas.</p>';
     return;
   }
 
+  // Dos secciones, para no confundir lo que hay que atender con lo que ya pasó.
+  // "Activas" son las confirmadas de hoy en adelante; el resto es historial.
+  const hoy = hoyISO();
+  const activas = data.filter((c) => c.estado === "confirmada" && c.fecha >= hoy);
+  const historial = data
+    .filter((c) => !(c.estado === "confirmada" && c.fecha >= hoy))
+    .reverse();   // el historial se lee al revés: lo más reciente primero
+
   listEl.innerHTML = "";
-  data.forEach((cita) => listEl.appendChild(renderCita(cita)));
+  listEl.appendChild(renderSeccionCitas({
+    clave: "activas",
+    titulo: "Próximas",
+    ayuda: "Confirmadas y todavía por atender, de hoy en adelante.",
+    citas: activas,
+    vacio: "No hay citas próximas.",
+  }));
+  listEl.appendChild(renderSeccionCitas({
+    clave: "historial",
+    titulo: "Pasadas o canceladas",
+    ayuda: "Ya no requieren acción: o se canceló, o la fecha quedó atrás.",
+    citas: historial,
+    vacio: "Ninguna por ahora.",
+  }));
+}
+
+function renderSeccionCitas({ clave, titulo, ayuda, citas, vacio }) {
+  const seccion = document.createElement("section");
+  seccion.className = "grupo grupo--" + clave;
+
+  const cab = document.createElement("div");
+  cab.className = "grupo__head";
+
+  const h = document.createElement("h3");
+  h.className = "grupo__titulo";
+  h.textContent = titulo;
+  cab.appendChild(h);
+
+  const cuenta = document.createElement("span");
+  cuenta.className = "grupo__cuenta";
+  cuenta.textContent = String(citas.length);
+  cab.appendChild(cuenta);
+
+  seccion.appendChild(cab);
+
+  const nota = document.createElement("p");
+  nota.className = "grupo__ayuda";
+  nota.textContent = ayuda;
+  seccion.appendChild(nota);
+
+  if (citas.length === 0) {
+    const vacia = document.createElement("p");
+    vacia.className = "empty-state empty-state--chica";
+    vacia.textContent = vacio;
+    seccion.appendChild(vacia);
+    return seccion;
+  }
+
+  const lista = document.createElement("div");
+  lista.className = "citas-list__filas";
+  citas.forEach((cita) => lista.appendChild(renderCita(cita)));
+  seccion.appendChild(lista);
+
+  return seccion;
 }
 
 function renderCita(cita) {
   const row = document.createElement("div");
   row.className = "card-row";
-  row.style.setProperty("--sede-color", "");
 
   const info = document.createElement("div");
   info.className = "info";
@@ -206,26 +236,10 @@ function renderCita(cita) {
     : cita.telefono_cliente;
   info.appendChild(contacto);
 
-  // Chip de sede con su color
+  // Chip de sede con su color: el trabajador puede tener ambas sedes.
   const chips = document.createElement("div");
   chips.className = "card-row__chips";
   chips.appendChild(chipSede(cita.sede_id));
-
-  // A quién está asignada
-  if (cita.asignado_a) {
-    const t = trabajadores.find((t) => t.id === cita.asignado_a);
-    const asign = document.createElement("span");
-    asign.className = "chip-asignado";
-    asign.textContent = esTrabajador()
-      ? "Asignada a ti"
-      : `→ ${t ? (t.nombre || t.email) : "trabajador"}`;
-    chips.appendChild(asign);
-  } else if (esAdmin()) {
-    const sin = document.createElement("span");
-    sin.className = "chip-asignado chip-asignado--vacio";
-    sin.textContent = "Sin asignar";
-    chips.appendChild(sin);
-  }
   info.appendChild(chips);
 
   const acciones = document.createElement("div");
@@ -233,35 +247,14 @@ function renderCita(cita) {
 
   const badge = document.createElement("span");
   const cancelada = cita.estado === "cancelada";
-  badge.className = `badge badge-${cancelada ? "cancelada" : "confirmada"}`;
-  badge.textContent = cancelada ? "Cancelada" : "Confirmada";
+  const pasada = !cancelada && cita.fecha < hoyISO();
+  badge.className = `badge badge-${cancelada ? "cancelada" : pasada ? "ocupado" : "confirmada"}`;
+  badge.textContent = cancelada ? "Cancelada" : pasada ? "Ya pasó" : "Confirmada";
   acciones.appendChild(badge);
 
-  // Solo el admin delega citas
-  if (esAdmin() && !cancelada) {
-    const select = document.createElement("select");
-    select.className = "select-asignar";
-    select.title = "Delegar esta cita a un trabajador";
-
-    const vacio = document.createElement("option");
-    vacio.value = "";
-    vacio.textContent = "Sin asignar";
-    select.appendChild(vacio);
-
-    trabajadores.forEach((t) => {
-      const opt = document.createElement("option");
-      opt.value = t.id;
-      opt.textContent = t.nombre || t.email;
-      if (t.id === cita.asignado_a) opt.selected = true;
-      select.appendChild(opt);
-    });
-
-    select.addEventListener("change", () => asignarCita(cita.id, select.value || null));
-    acciones.appendChild(select);
-  }
-
-  // Cancelar: el admin cualquiera; el trabajador solo las suyas (RLS lo respalda)
-  if (!cancelada) {
+  // Solo se cancela lo que todavía está por venir. Cancelar una cita pasada no
+  // libera nada útil y solo ensucia el historial.
+  if (!cancelada && !pasada) {
     const btn = document.createElement("button");
     btn.className = "btn-small";
     btn.textContent = "Cancelar";
@@ -272,21 +265,6 @@ function renderCita(cita) {
   row.appendChild(info);
   row.appendChild(acciones);
   return row;
-}
-
-async function asignarCita(citaId, trabajadorId) {
-  const { error } = await supabase
-    .from("citas")
-    .update({ asignado_a: trabajadorId })
-    .eq("id", citaId);
-
-  if (error) {
-    showToast("No se pudo asignar la cita.", "error");
-    console.error(error);
-    return;
-  }
-  showToast(trabajadorId ? "Cita delegada. Se le avisará por correo." : "Cita sin asignar.");
-  cargarCitas();
 }
 
 async function cancelarCita(id) {
@@ -680,6 +658,17 @@ export async function cargarHorarios() {
   // La barra de borrado solo tiene sentido si el admin tiene algo que borrar.
   const barra = document.getElementById("lote-bar");
   if (barra) barra.classList.toggle("hidden", !esAdmin());
+  const todos = document.getElementById("chk-todos-horarios");
+  if (todos) todos.checked = false;
+  actualizarBarraLote();
+}
+
+// Deja la barra de borrado en cero y fuera de vista: se usa cuando la lista
+// queda sin filas, para que no quede un contador viejo colgado.
+function apagarBarraLote() {
+  seleccionHorarios.clear();
+  const barra = document.getElementById("lote-bar");
+  if (barra) barra.classList.add("hidden");
   const todos = document.getElementById("chk-todos-horarios");
   if (todos) todos.checked = false;
   actualizarBarraLote();

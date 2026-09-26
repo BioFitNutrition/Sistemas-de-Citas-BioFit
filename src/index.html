@@ -31,14 +31,69 @@
       <p class="kicker">Ciencia que transforma tu cuerpo</p>
       <h1>Agenda tu asesoría nutricional</h1>
       <p class="subtitle">Sesiones de 20 minutos en Magdalena del Mar o Jesús María.</p>
-      <button id="btn-soy-cliente" class="btn-primary btn-large">SOY SOCIO</button>
+      <div class="hero__acciones">
+        <button id="btn-soy-cliente" class="btn-primary btn-large">SOY SOCIO</button>
+        <button id="btn-soy-nuevo" class="btn-secundario btn-large">SOY NUEVO</button>
+      </div>
+      <p class="hero__pista">¿Primera vez en BioFit? Entra por <strong>SOY NUEVO</strong> y te explicamos cómo funciona.</p>
+    </div>
+  </section>
+
+  <!-- ============ BIENVENIDA (Soy nuevo) ============ -->
+  <section id="view-bienvenida" class="view hidden">
+    <button class="btn-back" data-back="home">← Volver</button>
+
+    <div class="bienvenida">
+      <p class="kicker">Bienvenido a BioFit</p>
+      <h2 class="bienvenida__titulo">Qué bueno tenerte por aquí</h2>
+      <p class="bienvenida__texto">
+        En BioFit trabajamos la nutrición con base científica y acompañamiento real:
+        nada de dietas genéricas. Tu primera cita es una <strong>asesoría de 20 minutos</strong>
+        con nuestro nutricionista, para conocerte y entender qué necesita tu cuerpo.
+      </p>
+
+      <h3 class="bienvenida__sub">Cómo va a ser tu cita</h3>
+      <ol class="pasos">
+        <li class="pasos__item">
+          <span class="pasos__num">1</span>
+          <span>
+            <strong>Eliges la sede que te quede más cerca.</strong>
+            Estamos dentro de los gimnasios XFLY de Magdalena del Mar y Jesús María.
+          </span>
+        </li>
+        <li class="pasos__item">
+          <span class="pasos__num">2</span>
+          <span>
+            <strong>Eliges el día y la hora.</strong>
+            Verás solo los horarios que están realmente libres.
+          </span>
+        </li>
+        <li class="pasos__item">
+          <span class="pasos__num">3</span>
+          <span>
+            <strong>Te llega la confirmación por correo.</strong>
+            Con la dirección exacta y el enlace para llegar.
+          </span>
+        </li>
+        <li class="pasos__item">
+          <span class="pasos__num">4</span>
+          <span>
+            <strong>Vienes 5 minutos antes.</strong>
+            No necesitas traer nada ni estar en ayunas. Si tienes análisis recientes, tráelos.
+          </span>
+        </li>
+      </ol>
+
+      <p class="bienvenida__cierre">¿Empezamos? Primero, dinos qué sede te queda más cerca.</p>
+      <button id="btn-nuevo-elegir-sede" class="btn-primary btn-large">Elegir mi sede</button>
     </div>
   </section>
 
   <!-- ============ SELECCIÓN DE SEDE ============ -->
   <section id="view-sede" class="view hidden">
-    <button class="btn-back" data-back="home">← Volver</button>
-    <h2>Elige tu sede</h2>
+    <button class="btn-back" id="btn-volver-sede" data-back="home">← Volver</button>
+    <h2 id="sede-titulo">Elige tu sede</h2>
+    <p id="sede-ayuda" class="sede-ayuda hidden">Ambas quedan dentro de un gimnasio XFLY. Elige la que te quede más cerca; después verás el mapa para llegar.</p>
     <div id="sede-grid" class="sede-grid"></div>
   </section>
 
@@ -109,6 +164,10 @@
         <span class="gcal-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18M8 14h5"/></svg></span>
         Tu información de contacto
       </p>
+      <p id="booking-nuevo" class="aviso-nuevo hidden">
+        Es tu primera vez: con estos datos te enviamos la confirmación y te
+        reconocemos al llegar. Ven 5 minutos antes y pregunta por BioFit en recepción.
+      </p>
       <form id="form-cita" class="form-stack">
         <label>Nombre
           <input required name="nombre" autocomplete="given-name" />
@@ -153,6 +212,10 @@
         <span><strong id="conf-sede"></strong><br><small id="conf-ciudad"></small></span>
       </p>
       <hr class="booking__hr" />
+      <p id="conf-nuevo" class="aviso-nuevo hidden">
+        ¡Nos vemos pronto! Llega 5 minutos antes y pregunta por BioFit en la
+        recepción del gimnasio. No necesitas traer nada ni venir en ayunas.
+      </p>
       <p class="nota">Si necesitas reprogramar o cancelar, contáctanos directamente.</p>
       <button class="btn-primary" data-back="home">Volver al inicio</button>
     </div>

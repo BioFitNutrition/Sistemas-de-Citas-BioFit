@@ -524,6 +524,8 @@ body {
 .inline-form input, .inline-form select { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--color-border); }
 
 .citas-list, .horarios-list { display: flex; flex-direction: column; gap: 10px; }
+.citas-list { gap: 24px; }
+.citas-list__filas { display: flex; flex-direction: column; gap: 10px; }
 .card-row {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -1194,6 +1196,140 @@ body {
   .dia__franja { margin-left: 0; width: 100%; }
 }
 
+/* ============================================
+   PORTADA — dos entradas
+   ============================================ */
+
+.hero__acciones {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.hero__pista {
+  margin: 18px 0 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+/* Segundo botón: mismo peso visual, menos jerarquía que el primario. */
+.btn-secundario {
+  background: var(--color-surface);
+  color: var(--color-primary-dark);
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius);
+  padding: 14px 24px;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.btn-secundario:hover { background: var(--color-primary-light); }
+.btn-secundario:active { transform: scale(0.98); }
+
+/* ============================================
+   BIENVENIDA — "Soy nuevo"
+   Quien nunca ha venido necesita saber qué le espera antes de dar sus datos.
+   ============================================ */
+
+.bienvenida {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 28px 24px;
+}
+.bienvenida .kicker { margin-bottom: 6px; }
+.bienvenida__titulo { margin: 0 0 12px; font-size: 1.5rem; }
+.bienvenida__texto { margin: 0 0 24px; line-height: 1.6; color: var(--color-text); }
+.bienvenida__sub {
+  margin: 0 0 14px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--color-text-muted);
+}
+.bienvenida__cierre { margin: 24px 0 18px; font-weight: 600; }
+
+.pasos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.pasos__item { display: flex; align-items: flex-start; gap: 12px; line-height: 1.5; font-size: 0.95rem; }
+.pasos__num {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.sede-ayuda {
+  margin: -8px 0 18px;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+/* Recordatorios que solo ve quien viene por primera vez. */
+.aviso-nuevo {
+  margin: 0 0 18px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 520px) {
+  .hero__acciones { flex-direction: column; }
+  .hero__acciones button { width: 100%; }
+}
+
+/* ============================================
+   USUARIOS — la sede manda sobre los correos de aviso
+   ============================================ */
+
+.usuario-sede {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+.select-sede-usuario {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.select-sede-usuario:focus { outline: 2px solid var(--color-primary); border-color: transparent; }
+.select-sede-usuario:disabled { opacity: 0.5; cursor: wait; }
+
+.usuario-avisos { font-size: 0.8rem; color: var(--color-text-muted); margin-top: 4px; }
+
+/* Correo que no se administra a mano, sino desde la ficha del trabajador. */
+.chip-origen {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--color-neutral-light);
+  color: var(--color-text-muted);
+}
+
 </style>
 </head>
 <body>
@@ -1219,14 +1355,69 @@ body {
       <p class="kicker">Ciencia que transforma tu cuerpo</p>
       <h1>Agenda tu asesoría nutricional</h1>
       <p class="subtitle">Sesiones de 20 minutos en Magdalena del Mar o Jesús María.</p>
-      <button id="btn-soy-cliente" class="btn-primary btn-large">SOY SOCIO</button>
+      <div class="hero__acciones">
+        <button id="btn-soy-cliente" class="btn-primary btn-large">SOY SOCIO</button>
+        <button id="btn-soy-nuevo" class="btn-secundario btn-large">SOY NUEVO</button>
+      </div>
+      <p class="hero__pista">¿Primera vez en BioFit? Entra por <strong>SOY NUEVO</strong> y te explicamos cómo funciona.</p>
+    </div>
+  </section>
+
+  <!-- ============ BIENVENIDA (Soy nuevo) ============ -->
+  <section id="view-bienvenida" class="view hidden">
+    <button class="btn-back" data-back="home">← Volver</button>
+
+    <div class="bienvenida">
+      <p class="kicker">Bienvenido a BioFit</p>
+      <h2 class="bienvenida__titulo">Qué bueno tenerte por aquí</h2>
+      <p class="bienvenida__texto">
+        En BioFit trabajamos la nutrición con base científica y acompañamiento real:
+        nada de dietas genéricas. Tu primera cita es una <strong>asesoría de 20 minutos</strong>
+        con nuestro nutricionista, para conocerte y entender qué necesita tu cuerpo.
+      </p>
+
+      <h3 class="bienvenida__sub">Cómo va a ser tu cita</h3>
+      <ol class="pasos">
+        <li class="pasos__item">
+          <span class="pasos__num">1</span>
+          <span>
+            <strong>Eliges la sede que te quede más cerca.</strong>
+            Estamos dentro de los gimnasios XFLY de Magdalena del Mar y Jesús María.
+          </span>
+        </li>
+        <li class="pasos__item">
+          <span class="pasos__num">2</span>
+          <span>
+            <strong>Eliges el día y la hora.</strong>
+            Verás solo los horarios que están realmente libres.
+          </span>
+        </li>
+        <li class="pasos__item">
+          <span class="pasos__num">3</span>
+          <span>
+            <strong>Te llega la confirmación por correo.</strong>
+            Con la dirección exacta y el enlace para llegar.
+          </span>
+        </li>
+        <li class="pasos__item">
+          <span class="pasos__num">4</span>
+          <span>
+            <strong>Vienes 5 minutos antes.</strong>
+            No necesitas traer nada ni estar en ayunas. Si tienes análisis recientes, tráelos.
+          </span>
+        </li>
+      </ol>
+
+      <p class="bienvenida__cierre">¿Empezamos? Primero, dinos qué sede te queda más cerca.</p>
+      <button id="btn-nuevo-elegir-sede" class="btn-primary btn-large">Elegir mi sede</button>
     </div>
   </section>
 
   <!-- ============ SELECCIÓN DE SEDE ============ -->
   <section id="view-sede" class="view hidden">
-    <button class="btn-back" data-back="home">← Volver</button>
-    <h2>Elige tu sede</h2>
+    <button class="btn-back" id="btn-volver-sede" data-back="home">← Volver</button>
+    <h2 id="sede-titulo">Elige tu sede</h2>
+    <p id="sede-ayuda" class="sede-ayuda hidden">Ambas quedan dentro de un gimnasio XFLY. Elige la que te quede más cerca; después verás el mapa para llegar.</p>
     <div id="sede-grid" class="sede-grid"></div>
   </section>
 
@@ -1297,6 +1488,10 @@ body {
         <span class="gcal-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18M8 14h5"/></svg></span>
         Tu información de contacto
       </p>
+      <p id="booking-nuevo" class="aviso-nuevo hidden">
+        Es tu primera vez: con estos datos te enviamos la confirmación y te
+        reconocemos al llegar. Ven 5 minutos antes y pregunta por BioFit en recepción.
+      </p>
       <form id="form-cita" class="form-stack">
         <label>Nombre
           <input required name="nombre" autocomplete="given-name" />
@@ -1341,6 +1536,10 @@ body {
         <span><strong id="conf-sede"></strong><br><small id="conf-ciudad"></small></span>
       </p>
       <hr class="booking__hr" />
+      <p id="conf-nuevo" class="aviso-nuevo hidden">
+        ¡Nos vemos pronto! Llega 5 minutos antes y pregunta por BioFit en la
+        recepción del gimnasio. No necesitas traer nada ni venir en ayunas.
+      </p>
       <p class="nota">Si necesitas reprogramar o cancelar, contáctanos directamente.</p>
       <button class="btn-primary" data-back="home">Volver al inicio</button>
     </div>
@@ -2342,6 +2541,7 @@ const state = {
   disponibilidad: {},          // { 'YYYY-MM-DD': [ { id, fecha, hora }, ... ] }
   refDia: null,                // primer día visible en las columnas de horarios
   diaSel: null,                // 'YYYY-MM-DD' del día resaltado
+  esNuevo: false,              // entró por "Soy nuevo": se le acompaña más
 };
 
 let resizeTimer = null;
@@ -2370,8 +2570,19 @@ function initClientFlow() {
   document.getElementById("booking-tz").textContent = ZONA_HORARIA;
   document.getElementById("conf-tz").textContent = ZONA_HORARIA;
 
+  // Dos entradas al mismo flujo. La diferencia es el acompañamiento, no el
+  // mecanismo: las dos terminan guardando la misma cita en la misma tabla.
   document.getElementById("btn-soy-cliente").addEventListener("click", () => {
-    showView("view-sede");
+    entrarAlFlujo(false);
+  });
+
+  document.getElementById("btn-soy-nuevo").addEventListener("click", () => {
+    state.esNuevo = true;
+    showView("view-bienvenida");
+  });
+
+  document.getElementById("btn-nuevo-elegir-sede").addEventListener("click", () => {
+    entrarAlFlujo(true);
   });
 
   document.querySelectorAll("[data-back]").forEach((btn) => {
@@ -2398,6 +2609,26 @@ function initClientFlow() {
   });
 
   document.getElementById("form-cita").addEventListener("submit", onSubmitCita);
+}
+
+// Prepara la pantalla de sedes según por dónde entró la persona. Al socio de
+// siempre se le va al grano; al nuevo se le explica dónde queda cada una.
+function entrarAlFlujo(esNuevo) {
+  state.esNuevo = esNuevo;
+
+  document.getElementById("sede-titulo").textContent = esNuevo
+    ? "¿Qué sede te queda más cerca?"
+    : "Elige tu sede";
+  document.getElementById("sede-ayuda").classList.toggle("hidden", !esNuevo);
+
+  // El "Volver" del nuevo regresa a la bienvenida, no a la portada.
+  const volver = document.getElementById("btn-volver-sede");
+  volver.dataset.back = esNuevo ? "bienvenida" : "home";
+
+  document.getElementById("booking-nuevo").classList.toggle("hidden", !esNuevo);
+  document.getElementById("conf-nuevo").classList.toggle("hidden", !esNuevo);
+
+  showView("view-sede");
 }
 
 // Las sedes vienen de la base, con su color.
@@ -2738,7 +2969,6 @@ function mostrarConfirmacion(horario, email) {
 
 
 let realtimeChannel = null;
-let trabajadores = [];   // cache para los selects de delegación (solo admin)
 let altaCal = null;      // calendario de alta de horarios (modo "varios")
 let seleccionHorarios = new Set();   // ids marcados para borrar en lote (admin)
 let diasAbiertos = new Set();        // "seccion|fecha" de los días desplegados
@@ -2818,8 +3048,6 @@ async function entrarAlPanel() {
   // Refresca el recuento del alta con la sede que corresponda al rol.
   actualizarResumenAlta();
 
-  if (esAdmin()) await cargarTrabajadores();
-
   showView("view-panel");
   cambiarTab("citas");
   await Promise.all([cargarCitas(), cargarHorarios()]);
@@ -2828,7 +3056,6 @@ async function entrarAlPanel() {
 
 function salirDelPanel() {
   desactivarRealtime();
-  trabajadores = [];
 }
 
 function cambiarTab(tab) {
@@ -2841,47 +3068,21 @@ function cambiarTab(tab) {
   });
 }
 
-// ---------- trabajadores (para delegar) ----------
-
-async function cargarTrabajadores() {
-  const { data, error } = await supabase
-    .from("perfiles")
-    .select("id, nombre, email, sede_id, activo")
-    .eq("rol", "trabajador")
-    .eq("activo", true)
-    .order("nombre");
-
-  if (error) {
-    console.error("No se pudieron cargar los trabajadores:", error);
-    trabajadores = [];
-    return;
-  }
-  trabajadores = data || [];
-}
-
-function getTrabajadores() {
-  return trabajadores;
-}
-
-async function refrescarTrabajadores() {
-  if (esAdmin()) await cargarTrabajadores();
-}
-
 // ---------- CITAS ----------
 
 async function cargarCitas() {
   const listEl = document.getElementById("citas-list");
   listEl.innerHTML = '<p class="loading">Cargando citas...</p>';
 
-  // El trabajador ve TODAS sus citas asignadas, sin importar la sede: su filtro
-  // está oculto y aquí se ignora a propósito. RLS ya limita la lista a las suyas.
+  // El trabajador ve las citas de SU SEDE, sin filtro propio: su selector está
+  // oculto y aquí se ignora a propósito. Quién ve qué lo decide RLS en la base.
   const filtro = esTrabajador()
     ? "todas"
     : document.getElementById("filtro-sede-citas").value;
 
   let query = supabase
     .from("citas")
-    .select("id, nombre_cliente, telefono_cliente, email_cliente, sede_id, fecha, hora, estado, asignado_a")
+    .select("id, nombre_cliente, telefono_cliente, email_cliente, sede_id, fecha, hora, estado")
     .order("fecha", { ascending: true })
     .order("hora", { ascending: true });
 
@@ -2897,19 +3098,79 @@ async function cargarCitas() {
 
   if (!data || data.length === 0) {
     listEl.innerHTML = esTrabajador()
-      ? '<p class="empty-state">Todavía no te han asignado ninguna cita.</p>'
+      ? '<p class="empty-state">Todavía no hay citas en tu sede.</p>'
       : '<p class="empty-state">No hay citas registradas.</p>';
     return;
   }
 
+  // Dos secciones, para no confundir lo que hay que atender con lo que ya pasó.
+  // "Activas" son las confirmadas de hoy en adelante; el resto es historial.
+  const hoy = hoyISO();
+  const activas = data.filter((c) => c.estado === "confirmada" && c.fecha >= hoy);
+  const historial = data
+    .filter((c) => !(c.estado === "confirmada" && c.fecha >= hoy))
+    .reverse();   // el historial se lee al revés: lo más reciente primero
+
   listEl.innerHTML = "";
-  data.forEach((cita) => listEl.appendChild(renderCita(cita)));
+  listEl.appendChild(renderSeccionCitas({
+    clave: "activas",
+    titulo: "Próximas",
+    ayuda: "Confirmadas y todavía por atender, de hoy en adelante.",
+    citas: activas,
+    vacio: "No hay citas próximas.",
+  }));
+  listEl.appendChild(renderSeccionCitas({
+    clave: "historial",
+    titulo: "Pasadas o canceladas",
+    ayuda: "Ya no requieren acción: o se canceló, o la fecha quedó atrás.",
+    citas: historial,
+    vacio: "Ninguna por ahora.",
+  }));
+}
+
+function renderSeccionCitas({ clave, titulo, ayuda, citas, vacio }) {
+  const seccion = document.createElement("section");
+  seccion.className = "grupo grupo--" + clave;
+
+  const cab = document.createElement("div");
+  cab.className = "grupo__head";
+
+  const h = document.createElement("h3");
+  h.className = "grupo__titulo";
+  h.textContent = titulo;
+  cab.appendChild(h);
+
+  const cuenta = document.createElement("span");
+  cuenta.className = "grupo__cuenta";
+  cuenta.textContent = String(citas.length);
+  cab.appendChild(cuenta);
+
+  seccion.appendChild(cab);
+
+  const nota = document.createElement("p");
+  nota.className = "grupo__ayuda";
+  nota.textContent = ayuda;
+  seccion.appendChild(nota);
+
+  if (citas.length === 0) {
+    const vacia = document.createElement("p");
+    vacia.className = "empty-state empty-state--chica";
+    vacia.textContent = vacio;
+    seccion.appendChild(vacia);
+    return seccion;
+  }
+
+  const lista = document.createElement("div");
+  lista.className = "citas-list__filas";
+  citas.forEach((cita) => lista.appendChild(renderCita(cita)));
+  seccion.appendChild(lista);
+
+  return seccion;
 }
 
 function renderCita(cita) {
   const row = document.createElement("div");
   row.className = "card-row";
-  row.style.setProperty("--sede-color", "");
 
   const info = document.createElement("div");
   info.className = "info";
@@ -2928,26 +3189,10 @@ function renderCita(cita) {
     : cita.telefono_cliente;
   info.appendChild(contacto);
 
-  // Chip de sede con su color
+  // Chip de sede con su color: el trabajador puede tener ambas sedes.
   const chips = document.createElement("div");
   chips.className = "card-row__chips";
   chips.appendChild(chipSede(cita.sede_id));
-
-  // A quién está asignada
-  if (cita.asignado_a) {
-    const t = trabajadores.find((t) => t.id === cita.asignado_a);
-    const asign = document.createElement("span");
-    asign.className = "chip-asignado";
-    asign.textContent = esTrabajador()
-      ? "Asignada a ti"
-      : `→ ${t ? (t.nombre || t.email) : "trabajador"}`;
-    chips.appendChild(asign);
-  } else if (esAdmin()) {
-    const sin = document.createElement("span");
-    sin.className = "chip-asignado chip-asignado--vacio";
-    sin.textContent = "Sin asignar";
-    chips.appendChild(sin);
-  }
   info.appendChild(chips);
 
   const acciones = document.createElement("div");
@@ -2955,35 +3200,14 @@ function renderCita(cita) {
 
   const badge = document.createElement("span");
   const cancelada = cita.estado === "cancelada";
-  badge.className = `badge badge-${cancelada ? "cancelada" : "confirmada"}`;
-  badge.textContent = cancelada ? "Cancelada" : "Confirmada";
+  const pasada = !cancelada && cita.fecha < hoyISO();
+  badge.className = `badge badge-${cancelada ? "cancelada" : pasada ? "ocupado" : "confirmada"}`;
+  badge.textContent = cancelada ? "Cancelada" : pasada ? "Ya pasó" : "Confirmada";
   acciones.appendChild(badge);
 
-  // Solo el admin delega citas
-  if (esAdmin() && !cancelada) {
-    const select = document.createElement("select");
-    select.className = "select-asignar";
-    select.title = "Delegar esta cita a un trabajador";
-
-    const vacio = document.createElement("option");
-    vacio.value = "";
-    vacio.textContent = "Sin asignar";
-    select.appendChild(vacio);
-
-    trabajadores.forEach((t) => {
-      const opt = document.createElement("option");
-      opt.value = t.id;
-      opt.textContent = t.nombre || t.email;
-      if (t.id === cita.asignado_a) opt.selected = true;
-      select.appendChild(opt);
-    });
-
-    select.addEventListener("change", () => asignarCita(cita.id, select.value || null));
-    acciones.appendChild(select);
-  }
-
-  // Cancelar: el admin cualquiera; el trabajador solo las suyas (RLS lo respalda)
-  if (!cancelada) {
+  // Solo se cancela lo que todavía está por venir. Cancelar una cita pasada no
+  // libera nada útil y solo ensucia el historial.
+  if (!cancelada && !pasada) {
     const btn = document.createElement("button");
     btn.className = "btn-small";
     btn.textContent = "Cancelar";
@@ -2994,21 +3218,6 @@ function renderCita(cita) {
   row.appendChild(info);
   row.appendChild(acciones);
   return row;
-}
-
-async function asignarCita(citaId, trabajadorId) {
-  const { error } = await supabase
-    .from("citas")
-    .update({ asignado_a: trabajadorId })
-    .eq("id", citaId);
-
-  if (error) {
-    showToast("No se pudo asignar la cita.", "error");
-    console.error(error);
-    return;
-  }
-  showToast(trabajadorId ? "Cita delegada. Se le avisará por correo." : "Cita sin asignar.");
-  cargarCitas();
 }
 
 async function cancelarCita(id) {
@@ -3407,6 +3616,17 @@ async function cargarHorarios() {
   actualizarBarraLote();
 }
 
+// Deja la barra de borrado en cero y fuera de vista: se usa cuando la lista
+// queda sin filas, para que no quede un contador viejo colgado.
+function apagarBarraLote() {
+  seleccionHorarios.clear();
+  const barra = document.getElementById("lote-bar");
+  if (barra) barra.classList.add("hidden");
+  const todos = document.getElementById("chk-todos-horarios");
+  if (todos) todos.checked = false;
+  actualizarBarraLote();
+}
+
 // Una sección ("Libres" / "Reservados o deshabilitados") con sus días adentro.
 function renderSeccionHorarios({ clave, titulo, ayuda, horarios, vacio, ocupados, conCita }) {
   const seccion = document.createElement("section");
@@ -3677,6 +3897,7 @@ function desactivarRealtime() {
 
 
 
+
 function initUsuarios() {
   const form = document.getElementById("form-nuevo-usuario");
   if (form) form.addEventListener("submit", onCrearUsuario);
@@ -3734,15 +3955,31 @@ function renderUsuario(u) {
   rol.className = `badge badge-${u.rol === "admin" ? "admin" : "trabajador"}`;
   rol.textContent = u.rol === "admin" ? "Administrador" : "Trabajador";
   chips.appendChild(rol);
-
-  // sede_id NULL = cubre todas las sedes. En el admin no se muestra: por
-  // definición ve todo, y el chip solo sería ruido.
-  if (u.sede_id) {
-    chips.appendChild(chipSede(u.sede_id));
-  } else if (u.rol !== "admin") {
-    chips.appendChild(chipAmbasSedes());
-  }
   info.appendChild(chips);
+
+  // La sede del trabajador se edita aquí mismo, y al cambiarla se reacomodan
+  // solos los correos de aviso que recibe. En el admin no se muestra: por
+  // definición ve y recibe todo.
+  if (u.rol !== "admin") {
+    const fila = document.createElement("label");
+    fila.className = "usuario-sede";
+    fila.textContent = "Sede que gestiona";
+
+    const sel = document.createElement("select");
+    sel.className = "select-sede-usuario";
+    llenarSelectSedes(sel, { incluirAmbas: true });
+    sel.value = u.sede_id ?? "ambas";
+    sel.addEventListener("change", () => cambiarSedeUsuario(u, sel));
+    fila.appendChild(sel);
+    info.appendChild(fila);
+
+    const avisos = document.createElement("span");
+    avisos.className = "usuario-avisos";
+    avisos.textContent = u.activo
+      ? `Recibe los avisos de ${listarNombres(sedesDe(u.sede_id))}.`
+      : "Inactivo: no recibe avisos.";
+    info.appendChild(avisos);
+  }
 
   const acciones = document.createElement("div");
   acciones.className = "card-row__acciones";
@@ -3757,7 +3994,7 @@ function renderUsuario(u) {
     const btn = document.createElement("button");
     btn.className = "btn-small secondary";
     btn.textContent = u.activo ? "Desactivar" : "Activar";
-    btn.addEventListener("click", () => alternarUsuario(u.id, !u.activo));
+    btn.addEventListener("click", () => alternarUsuario(u, !u.activo));
     acciones.appendChild(btn);
   }
 
@@ -3766,17 +4003,118 @@ function renderUsuario(u) {
   return row;
 }
 
-async function alternarUsuario(id, activo) {
-  const { error } = await supabase.from("perfiles").update({ activo }).eq("id", id);
+async function alternarUsuario(u, activo) {
+  const { error } = await supabase.from("perfiles").update({ activo }).eq("id", u.id);
   if (error) {
     showToast("No se pudo actualizar el usuario.", "error");
     console.error(error);
     return;
   }
-  showToast(activo ? "Usuario activado." : "Usuario desactivado.");
+
+  // Un trabajador desactivado deja de recibir los avisos; al reactivarlo se le
+  // devuelven los de su sede. Si no, seguirían llegándole datos de socios a
+  // alguien que ya no trabaja acá.
+  const cambio = await sincronizarCorreos(u.email, u.sede_id, activo);
+
+  showToast(activo
+    ? `Usuario activado. Vuelve a recibir los avisos de ${listarNombres(sedesDe(u.sede_id))}.`
+    : "Usuario desactivado. Ya no recibirá avisos.");
+  if (!cambio.ok) showToast("El usuario cambió, pero no se pudieron ajustar sus correos.", "error");
+
   await cargarUsuarios();
-  await refrescarTrabajadores();
+  await cargarNotificaciones();
   await cargarCitas();
+}
+
+// Cambia la sede del trabajador y arrastra con ella sus correos de aviso.
+async function cambiarSedeUsuario(u, select) {
+  const elegida = select.value === "ambas" ? null : select.value;
+  if (elegida === (u.sede_id ?? null)) return;
+
+  select.disabled = true;
+  const { error } = await supabase.from("perfiles").update({ sede_id: elegida }).eq("id", u.id);
+
+  if (error) {
+    showToast("No se pudo cambiar la sede.", "error");
+    console.error(error);
+    select.value = u.sede_id ?? "ambas";
+    select.disabled = false;
+    return;
+  }
+
+  const cambio = await sincronizarCorreos(u.email, elegida, u.activo);
+  select.disabled = false;
+
+  if (!cambio.ok) {
+    showToast("Sede cambiada, pero no se pudieron ajustar sus correos.", "error");
+  } else if (!u.activo) {
+    showToast("Sede cambiada. Como está inactivo, no recibe avisos.");
+  } else {
+    showToast(`Sede cambiada. Ahora recibe los avisos de ${listarNombres(sedesDe(elegida))}.`);
+  }
+
+  await cargarUsuarios();
+  await cargarNotificaciones();
+}
+
+// ---------- correos de aviso atados a la sede del trabajador ----------
+// Regla: un trabajador ACTIVO recibe los avisos de la sede que gestiona, y los
+// de las dos si gestiona ambas. Uno inactivo no recibe ninguno. Esta función
+// deja `notificaciones_sede` exactamente así para ese correo, sin tocar los
+// correos de nadie más (el Gmail de BioFit, el personal de Luis, etc.).
+
+function sedesDe(sedeId) {
+  return sedeId ? [sedeId] : getSedes().map((s) => s.id);
+}
+
+function listarNombres(ids) {
+  const nombres = ids.map(nombreSede);
+  if (nombres.length <= 1) return nombres.join("") || "ninguna sede";
+  return `${nombres.slice(0, -1).join(", ")} y ${nombres[nombres.length - 1]}`;
+}
+
+async function sincronizarCorreos(email, sedeId, activo) {
+  const objetivo = new Set(activo ? sedesDe(sedeId) : []);
+
+  const { data: actuales, error } = await supabase
+    .from("notificaciones_sede")
+    .select("id, sede_id")
+    .eq("email", email);
+
+  if (error) {
+    console.error("No se pudieron leer los correos del usuario:", error);
+    return { ok: false };
+  }
+
+  const yaTiene = new Set((actuales || []).map((r) => r.sede_id));
+  const sobran = (actuales || []).filter((r) => !objetivo.has(r.sede_id));
+  const faltan = [...objetivo].filter((id) => !yaTiene.has(id));
+
+  if (sobran.length > 0) {
+    const { error: errBorrar } = await supabase
+      .from("notificaciones_sede")
+      .delete()
+      .in("id", sobran.map((r) => r.id));
+    if (errBorrar) {
+      console.error("No se pudieron quitar los correos que sobraban:", errBorrar);
+      return { ok: false };
+    }
+  }
+
+  // Uno por uno: en un insert de varias filas, un choque con la restricción
+  // única (sede_id, email) tumbaría también las demás.
+  for (const sede of faltan) {
+    const { error: errAlta } = await supabase
+      .from("notificaciones_sede")
+      .insert({ sede_id: sede, email });
+    // 23505 = ya estaba. No es un fallo: es justo el estado que queríamos.
+    if (errAlta && errAlta.code !== "23505") {
+      console.error("No se pudo agregar el correo del usuario:", errAlta);
+      return { ok: false };
+    }
+  }
+
+  return { ok: true, agregadas: faltan, quitadas: sobran.map((r) => r.sede_id) };
 }
 
 async function onCrearUsuario(e) {
@@ -3825,9 +4163,15 @@ async function onCrearUsuario(e) {
     }
 
     form.reset();
-    showToast("Trabajador creado.");
+
+    // Recién creado: entra de una vez a los correos de aviso de su sede.
+    const correos = await sincronizarCorreos(payload.email, payload.sede_id, true);
+    showToast(correos.ok
+      ? `Trabajador creado. Recibirá los avisos de ${listarNombres(sedesDe(payload.sede_id))}.`
+      : "Trabajador creado, pero no se pudieron configurar sus correos de aviso.");
+
     await cargarUsuarios();
-    await refrescarTrabajadores();
+    await cargarNotificaciones();
   } catch (err) {
     console.error(err);
     errorEl.textContent =
@@ -3870,6 +4214,15 @@ async function cargarNotificaciones() {
   if (!listEl) return;
   listEl.innerHTML = '<p class="loading">Cargando correos...</p>';
 
+  // Los correos de los trabajadores los pone y los quita la pestaña Usuarios,
+  // según la sede de cada uno. Se marcan para que no parezca que reaparecen
+  // solos si alguien los quita a mano desde aquí.
+  const { data: perfiles } = await supabase
+    .from("perfiles")
+    .select("email, rol")
+    .eq("rol", "trabajador");
+  const deTrabajadores = new Set((perfiles || []).map((u) => String(u.email).toLowerCase()));
+
   const { data, error } = await supabase
     .from("notificaciones_sede")
     .select("id, sede_id, email, activo")
@@ -3889,10 +4242,12 @@ async function cargarNotificaciones() {
   }
 
   listEl.innerHTML = "";
-  data.forEach((n) => listEl.appendChild(renderCorreo(n)));
+  data.forEach((n) =>
+    listEl.appendChild(renderCorreo(n, deTrabajadores.has(String(n.email).toLowerCase())))
+  );
 }
 
-function renderCorreo(n) {
+function renderCorreo(n, esDeTrabajador) {
   const row = document.createElement("div");
   row.className = "card-row";
 
@@ -3906,6 +4261,14 @@ function renderCorreo(n) {
   const chips = document.createElement("div");
   chips.className = "card-row__chips";
   chips.appendChild(chipSede(n.sede_id));
+
+  if (esDeTrabajador) {
+    const origen = document.createElement("span");
+    origen.className = "chip-origen";
+    origen.textContent = "Se gestiona en Usuarios";
+    origen.title = "Este correo se agrega y se quita solo, según la sede del trabajador.";
+    chips.appendChild(origen);
+  }
   info.appendChild(chips);
 
   const acciones = document.createElement("div");

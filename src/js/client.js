@@ -20,6 +20,7 @@ const state = {
   disponibilidad: {},          // { 'YYYY-MM-DD': [ { id, fecha, hora }, ... ] }
   refDia: null,                // primer día visible en las columnas de horarios
   diaSel: null,                // 'YYYY-MM-DD' del día resaltado
+  esNuevo: false,              // entró por "Soy nuevo": se le acompaña más
 };
 
 let resizeTimer = null;
@@ -48,8 +49,19 @@ export function initClientFlow() {
   document.getElementById("booking-tz").textContent = ZONA_HORARIA;
   document.getElementById("conf-tz").textContent = ZONA_HORARIA;
 
+  // Dos entradas al mismo flujo. La diferencia es el acompañamiento, no el
+  // mecanismo: las dos terminan guardando la misma cita en la misma tabla.
   document.getElementById("btn-soy-cliente").addEventListener("click", () => {
-    showView("view-sede");
+    entrarAlFlujo(false);
+  });
+
+  document.getElementById("btn-soy-nuevo").addEventListener("click", () => {
+    state.esNuevo = true;
+    showView("view-bienvenida");
+  });
+
+  document.getElementById("btn-nuevo-elegir-sede").addEventListener("click", () => {
+    entrarAlFlujo(true);
   });
 
   document.querySelectorAll("[data-back]").forEach((btn) => {
@@ -76,6 +88,26 @@ export function initClientFlow() {
   });
 
   document.getElementById("form-cita").addEventListener("submit", onSubmitCita);
+}
+
+// Prepara la pantalla de sedes según por dónde entró la persona. Al socio de
+// siempre se le va al grano; al nuevo se le explica dónde queda cada una.
+function entrarAlFlujo(esNuevo) {
+  state.esNuevo = esNuevo;
+
+  document.getElementById("sede-titulo").textContent = esNuevo
+    ? "¿Qué sede te queda más cerca?"
+    : "Elige tu sede";
+  document.getElementById("sede-ayuda").classList.toggle("hidden", !esNuevo);
+
+  // El "Volver" del nuevo regresa a la bienvenida, no a la portada.
+  const volver = document.getElementById("btn-volver-sede");
+  volver.dataset.back = esNuevo ? "bienvenida" : "home";
+
+  document.getElementById("booking-nuevo").classList.toggle("hidden", !esNuevo);
+  document.getElementById("conf-nuevo").classList.toggle("hidden", !esNuevo);
+
+  showView("view-sede");
 }
 
 // Las sedes vienen de la base, con su color.

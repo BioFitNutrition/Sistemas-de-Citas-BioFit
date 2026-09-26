@@ -58,17 +58,25 @@ con un límite de ~500 correos/día (de sobra para este volumen).
 | Actor | ¿Inicia sesión? | Qué puede hacer |
 |---|---|---|
 | **Cliente / socio** | **No.** Acceso anónimo | Solo reservar una cita desde la web pública. No tiene registro, ni credenciales, ni panel. No construir login para él. |
-| **Trabajador** | Sí | Ve y edita **solo las citas que el admin le delegó**. Gestiona horarios **solo de su sede asignada**. |
+| **Trabajador** | Sí | Ve y edita **las citas de su sede** (o de ambas si su `sede_id` es NULL). Gestiona horarios **solo de su sede**. Recibe por correo los avisos de su sede. |
 | **Administrador** (Luis) | Sí | Control total: citas, horarios, usuarios, configuración de correos, y delegar citas a trabajadores. |
 
 ---
 
 ## Base de datos — ESTADO REAL EN PRODUCCIÓN
 
-> ⚠️ **La base de datos ya está construida, migrada y verificada.**
-> No la modifiques. Si crees que falta algo, avisa antes de tocarla.
-> `supabase/schema.sql` en el repo está DESACTUALIZADO — sirve solo como
-> referencia histórica, no como fuente de verdad.
+> **La base de datos la manejas TÚ** (desde 26/09/2026). Está construida,
+> migrada y verificada; `supabase/schema.sql` es el volcado real y al día.
+>
+> Tres obligaciones al migrar, sin excepción:
+> 1. Avisar a Christopher ANTES.
+> 2. Actualizar `supabase/schema.sql` y esta sección en el mismo cambio.
+> 3. Anotarlo en `ESTADO.md` bajo el título **"Cambios en la base"**, con el SQL
+>    que corriste. Es lo único que ve Claude (chat): sin eso, trabaja con una
+>    foto vieja y les da instrucciones contradictorias a los dos.
+>
+> ⚠️ El repo es PÚBLICO. Al volcar el esquema, nunca copies literal el cuerpo de
+> `notificar_cita()`: lleva el WEBHOOK_SECRET embebido.
 
 ### `sedes`
 | Columna | Tipo | Notas |
@@ -110,7 +118,10 @@ Restricción única: `(sede_id, fecha, hora)`
 `id` uuid PK · `horario_id` → horarios_disponibles · `sede_id` → sedes ·
 `nombre_cliente` · `telefono_cliente` · `email_cliente` ·
 `fecha` · `hora` · `estado` (`confirmada` \| `cancelada`) · `created_at` ·
-**`asignado_a`** uuid → perfiles (nullable) — trabajador al que se delegó la cita
+`asignado_a` uuid → perfiles (nullable) — **en desuso**. Era la delegación cita
+por cita, que se eliminó el 25/09/2026. La columna se deja como historial de lo
+que ya estaba delegado; el frontend no la escribe ni la lee. Si un día se borra,
+hay que quitar antes el trigger `trg_notificar_cita_delegada`.
 
 ### `perfiles`
 `id` uuid PK → `auth.users` · `email` · `nombre` ·
@@ -123,6 +134,13 @@ Restricción única: `(sede_id, email)`
 
 Correos que reciben el aviso interno cuando entra una cita. Varios por sede,
 editables desde el panel por el admin.
+
+⚠️ **Los correos de los trabajadores los administra la pestaña Usuarios, no la
+de Correos.** Al crear un trabajador se le da de alta en su sede (o en las dos);
+al cambiarle la sede o desactivarlo, sus filas se reacomodan solas. Tocarlos a
+mano desde la pestaña Correos funciona, pero el próximo cambio de sede los
+vuelve a dejar como manda la ficha del usuario. Por eso esas filas salen
+marcadas con "Se gestiona en Usuarios".
 
 ### Funciones helper (usables como RPC desde el frontend)
 
@@ -149,7 +167,7 @@ RLS, por eso deben conservar su `GRANT EXECUTE` a `authenticated`.
 |---|---|---|---|
 | `sedes` | leer | leer | leer + editar |
 | `horarios_disponibles` | leer | leer; crear/editar **solo su sede**; **no puede borrar** | todo |
-| `citas` | **solo insertar** (no puede leer ninguna) | ver/editar **solo las asignadas a él**; **no puede borrar** | todo |
+| `citas` | **solo insertar** (no puede leer ninguna) | ver/editar **las de su sede** (todas si `sede_id` es NULL); **no puede borrar** | todo |
 | `perfiles` | sin acceso | solo su propio perfil | todo |
 | `notificaciones_sede` | sin acceso | sin acceso | todo |
 
@@ -177,16 +195,19 @@ está en `utils.js`.
 
 ## Reglas de trabajo
 
-1. **No modificar la base de datos por tu cuenta.** Ya está construida y verificada.
-   Hay UNA sola migración aprobada pendiente: agregar `citas.cancelada_por`
-   (ver `TAREAS.md` punto 7). Cualquier otra cosa, avisa antes.
-2. **No romper el diseño.** La interfaz ya fue aprobada por el cliente: calendario
+1. **La base es tuya, pero se avisa antes y se deja registrado después**
+   (ver la sección de base de datos). Migraciones ya aprobadas y pendientes:
+   `citas.cancelada_por` (punto 7) y `citas.dni_cliente`, nullable (punto 14).
+2. **Comentarios: los justos.** No llenes el código de comentarios explicando lo
+   obvio. Se comenta solo lo que sorprende — una decisión contraintuitiva, una
+   trampa que ya mordió. Si algo necesita tres párrafos, va en `ESTADO.md`.
+3. **No romper el diseño.** La interfaz ya fue aprobada por el cliente: calendario
    estilo Google Calendar, tarjeta de login con la marca, paleta BioFit.
-3. **Nunca poner la `service_role` key en el frontend.** El repositorio es público.
+4. **Nunca poner la `service_role` key en el frontend.** El repositorio es público.
    Todo lo que necesite privilegios va en una Edge Function.
-4. **La `anon key` sí puede ir en el frontend** — es su uso previsto, y RLS es lo
+5. **La `anon key` sí puede ir en el frontend** — es su uso previsto, y RLS es lo
    que realmente protege los datos.
-5. Español para todo lo que ve el usuario final (labels, mensajes, correos).
+6. Español para todo lo que ve el usuario final (labels, mensajes, correos).
 
 ### Paleta de marca BioFit
 

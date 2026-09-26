@@ -28,6 +28,15 @@ export async function cargarNotificaciones() {
   if (!listEl) return;
   listEl.innerHTML = '<p class="loading">Cargando correos...</p>';
 
+  // Los correos de los trabajadores los pone y los quita la pestaña Usuarios,
+  // según la sede de cada uno. Se marcan para que no parezca que reaparecen
+  // solos si alguien los quita a mano desde aquí.
+  const { data: perfiles } = await supabase
+    .from("perfiles")
+    .select("email, rol")
+    .eq("rol", "trabajador");
+  const deTrabajadores = new Set((perfiles || []).map((u) => String(u.email).toLowerCase()));
+
   const { data, error } = await supabase
     .from("notificaciones_sede")
     .select("id, sede_id, email, activo")
@@ -47,10 +56,12 @@ export async function cargarNotificaciones() {
   }
 
   listEl.innerHTML = "";
-  data.forEach((n) => listEl.appendChild(renderCorreo(n)));
+  data.forEach((n) =>
+    listEl.appendChild(renderCorreo(n, deTrabajadores.has(String(n.email).toLowerCase())))
+  );
 }
 
-function renderCorreo(n) {
+function renderCorreo(n, esDeTrabajador) {
   const row = document.createElement("div");
   row.className = "card-row";
 
@@ -64,6 +75,14 @@ function renderCorreo(n) {
   const chips = document.createElement("div");
   chips.className = "card-row__chips";
   chips.appendChild(chipSede(n.sede_id));
+
+  if (esDeTrabajador) {
+    const origen = document.createElement("span");
+    origen.className = "chip-origen";
+    origen.textContent = "Se gestiona en Usuarios";
+    origen.title = "Este correo se agrega y se quita solo, según la sede del trabajador.";
+    chips.appendChild(origen);
+  }
   info.appendChild(chips);
 
   const acciones = document.createElement("div");
