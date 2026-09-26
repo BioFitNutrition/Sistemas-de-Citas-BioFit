@@ -625,6 +625,40 @@ select:disabled { opacity: 0.55; cursor: not-allowed; box-shadow: none; }
   margin: 0 auto 16px;
 }
 .check-icon svg { width: 30px; height: 30px; }
+
+/* Cancelación por parte del socio */
+.cancel-icon {
+  width: 60px; height: 60px;
+  border-radius: 50%;
+  background: transparent;
+  border: 2px solid var(--color-danger);
+  color: var(--color-danger);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 16px;
+}
+.cancel-icon svg { width: 30px; height: 30px; }
+
+/* El botón destructivo NO es el primario: el que se ve primero es "mantenerla".
+   En móvil se apilan, y "mantenerla" queda arriba por la misma razón. */
+.cancelar-acciones {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 10px;
+  margin-top: 8px;
+}
+.btn-cancelar {
+  padding: 14px 24px;
+  border: 1px solid var(--color-danger);
+  border-radius: 999px;
+  background: var(--color-danger-light);
+  color: var(--color-danger);
+  font-size: 1rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+.btn-cancelar:hover:not(:disabled) { background: var(--color-danger); color: #fff; }
+.btn-cancelar:disabled { opacity: 0.6; cursor: default; }
 .nota { color: var(--color-text-muted); font-size: 0.9rem; margin: 16px 0 24px; }
 
 /* Admin */
@@ -1914,6 +1948,57 @@ select:disabled { opacity: 0.55; cursor: not-allowed; box-shadow: none; }
       </p>
       <p class="nota">Si necesitas reprogramar o cancelar, contáctanos directamente.</p>
       <button class="btn-primary" data-back="home">Volver al inicio</button>
+    </div>
+  </section>
+
+  <!-- ============ CANCELAR (el socio, desde el enlace del correo) ============ -->
+  <section id="view-cancelar" class="view hidden">
+    <div class="confirmacion-box">
+      <p id="cancelar-cargando" class="loading">Buscando tu cita...</p>
+
+      <!-- Enlace inválido, ya usado, o cita fuera de plazo -->
+      <div id="cancelar-aviso" class="hidden">
+        <div class="cancel-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16.5v.01"/></svg></div>
+        <h2 id="cancelar-aviso-titulo">Este enlace ya no sirve</h2>
+        <p class="nota" id="cancelar-aviso-texto"></p>
+        <button class="btn-primary" data-back="home">Ir al inicio</button>
+      </div>
+
+      <!-- La cita se puede cancelar: se muestra y se pide confirmación -->
+      <div id="cancelar-detalle" class="hidden">
+        <h2>¿Cancelar tu cita?</h2>
+        <p class="nota" id="cancelar-saludo"></p>
+        <div class="conf-card">
+          <div class="conf-card__date">
+            <span class="conf-card__daynum" id="cancelar-day"></span>
+            <span class="conf-card__mon" id="cancelar-mon"></span>
+          </div>
+          <div class="conf-card__body">
+            <strong>Asesoría nutricional</strong>
+            <span id="cancelar-detalle-texto"></span>
+            <span>Hora de Perú (GMT−5)</span>
+          </div>
+        </div>
+        <p class="conf-loc">
+          <span class="gcal-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-5.5 7-11a7 7 0 0 0-14 0c0 5.5 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg></span>
+          <span><strong id="cancelar-sede"></strong><br><small id="cancelar-direccion"></small></span>
+        </p>
+        <hr class="booking__hr" />
+        <p class="nota">Si la cancelas, el horario queda libre para otra persona. Esto no se puede deshacer.</p>
+        <p id="cancelar-error" class="error-text hidden"></p>
+        <div class="cancelar-acciones">
+          <button type="button" id="cancelar-confirmar" class="btn-cancelar">Sí, cancelar mi cita</button>
+          <button type="button" class="btn-primary" data-back="home">No, mantenerla</button>
+        </div>
+      </div>
+
+      <!-- Ya quedó cancelada -->
+      <div id="cancelar-listo" class="hidden">
+        <div class="check-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 13l4 4L19 7"/></svg></div>
+        <h2>Tu cita quedó cancelada</h2>
+        <p class="nota">Avisamos al equipo de BioFit y el horario volvió a quedar libre. Si quieres, puedes reservar otro momento cuando gustes.</p>
+        <button class="btn-primary" data-back="home">Reservar otra cita</button>
+      </div>
     </div>
   </section>
 
@@ -5339,10 +5424,148 @@ async function quitarCorreo(id, email) {
 }
 
 
+// ===== cancelar.js =====
+// ============================================
+// El socio cancela su propia cita desde el correo
+// ============================================
+// Se entra por `?cancelar=<token>`. El token son 64 caracteres hex que viajan
+// en el botón del correo de confirmación.
+//
+// ⚠️ NUNCA se usa el id de la cita para esto: los uuid no son secretos, y con el
+// id cualquiera podría cancelar citas ajenas o barrerlas a mano.
+//
+// El anónimo NO puede leer ni editar `citas`. Todo pasa por dos funciones
+// SECURITY DEFINER que solo aceptan el token:
+//   cita_por_token(token)          -> datos mínimos + puede_cancelar + motivo
+//   cancelar_cita_por_token(token) -> {ok:true} | {ok:false, motivo}
+//
+// El plazo (2 horas antes) lo decide la BASE, no esta pantalla: acá solo se
+// muestra lo que ella responde. Si se validara aquí, bastaría con abrir la
+// consola para saltárselo.
+
+
+
+
+let tokenActual = null;
+
+function tokenDeCancelacion() {
+  const token = new URLSearchParams(window.location.search).get("cancelar");
+  return token && /^[0-9a-f]{64}$/.test(token) ? token : null;
+}
+
+// El token no puede quedarse en la barra de direcciones: se comparte al copiar
+// el enlace, queda en el historial y se va en el Referer.
+function limpiarUrlCancelacion() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("cancelar");
+  window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+}
+
+function mostrarBloque(id) {
+  ["cancelar-cargando", "cancelar-aviso", "cancelar-detalle", "cancelar-listo"]
+    .forEach((b) => document.getElementById(b).classList.toggle("hidden", b !== id));
+}
+
+function mostrarAviso(titulo, texto) {
+  document.getElementById("cancelar-aviso-titulo").textContent = titulo;
+  document.getElementById("cancelar-aviso-texto").textContent = texto;
+  mostrarBloque("cancelar-aviso");
+}
+
+async function abrirCancelacion(token) {
+  tokenActual = token;
+  showView("view-cancelar");
+  mostrarBloque("cancelar-cargando");
+  limpiarUrlCancelacion();
+
+  const { data, error } = await supabase.rpc("cita_por_token", { p_token: token });
+
+  if (error) {
+    console.error(error);
+    mostrarAviso("No pudimos abrir tu cita",
+      "Hubo un problema de conexión. Vuelve a intentarlo en un momento.");
+    return;
+  }
+
+  // Cero filas = enlace inválido o ya usado. La base no distingue entre los dos
+  // a propósito: así el enlace no sirve para averiguar si una cita existe.
+  const cita = Array.isArray(data) ? data[0] : data;
+  if (!cita) {
+    mostrarAviso("Este enlace ya no sirve",
+      "Puede que la cita ya se haya cancelado, o que el enlace haya caducado. Si necesitas ayuda, escríbenos.");
+    return;
+  }
+
+  if (!cita.puede_cancelar) {
+    mostrarAviso("No se puede cancelar por aquí",
+      cita.motivo || "Esta cita ya no se puede cancelar desde el enlace. Escríbenos y lo vemos.");
+    return;
+  }
+
+  pintarCita(cita);
+  mostrarBloque("cancelar-detalle");
+}
+
+function pintarCita(cita) {
+  const fecha = parseISO(cita.fecha);
+
+  document.getElementById("cancelar-saludo").textContent =
+    `Hola ${cita.nombre_cliente}, esta es la cita que tienes reservada:`;
+
+  document.getElementById("cancelar-day").textContent = fecha.getDate();
+  document.getElementById("cancelar-mon").textContent =
+    fecha.toLocaleDateString("es-PE", { month: "short" }).replace(".", "").toUpperCase();
+
+  const diaSemana = capitalizar(
+    fecha.toLocaleDateString("es-PE", { weekday: "long", day: "numeric", month: "long" }),
+  );
+  document.getElementById("cancelar-detalle-texto").textContent =
+    `${diaSemana} · ${rangoHora(cita.hora)}`;
+
+  document.getElementById("cancelar-sede").textContent = cita.sede_nombre || "";
+  document.getElementById("cancelar-direccion").textContent = cita.sede_direccion || "";
+}
+
+async function confirmarCancelacion() {
+  const btn = document.getElementById("cancelar-confirmar");
+  const errorEl = document.getElementById("cancelar-error");
+  errorEl.classList.add("hidden");
+  setLoading(btn, true, "Cancelando...");
+
+  const { data, error } = await supabase.rpc("cancelar_cita_por_token", { p_token: tokenActual });
+
+  setLoading(btn, false);
+
+  if (error) {
+    console.error(error);
+    errorEl.textContent = "No pudimos cancelarla. Revisa tu conexión y vuelve a intentarlo.";
+    errorEl.classList.remove("hidden");
+    return;
+  }
+
+  if (!data?.ok) {
+    // Llegó tarde: se canceló desde el panel, o se pasó el plazo mientras la
+    // pantalla estaba abierta. El motivo lo redacta la base.
+    mostrarAviso("No se pudo cancelar", data?.motivo || "Este enlace ya no sirve.");
+    return;
+  }
+
+  // El token ya quedó invalidado en la base; esta pantalla no sirve dos veces.
+  tokenActual = null;
+  mostrarBloque("cancelar-listo");
+}
+
+function initCancelacion() {
+  document.getElementById("cancelar-confirmar")
+    .addEventListener("click", confirmarCancelacion);
+}
+
+
 // ===== main.js =====
 // ============================================
 // Punto de entrada
 // ============================================
+
 
 
 
@@ -5364,6 +5587,7 @@ async function arrancar() {
   initPanel();
   initUsuarios();
   initNotificaciones();
+  initCancelacion();
 
   document.getElementById("btn-admin-login").addEventListener("click", () => {
     showView("view-admin-login");
@@ -5375,6 +5599,15 @@ async function arrancar() {
 
   document.getElementById("form-login").addEventListener("submit", onLogin);
   document.getElementById("btn-logout").addEventListener("click", onLogout);
+
+  // El enlace de cancelación manda: si el socio llegó por ahí, esa es la
+  // pantalla, y no se sigue con el arranque normal. Va antes de cargarPerfil()
+  // porque el socio no tiene sesión y no hay nada que esperar.
+  const token = tokenDeCancelacion();
+  if (token) {
+    await abrirCancelacion(token);
+    return;
+  }
 
   // Si ya había sesión abierta (recargó la página estando dentro), entra directo.
   const perfil = await cargarPerfil();

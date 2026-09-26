@@ -279,6 +279,57 @@
     </div>
   </section>
 
+  <!-- ============ CANCELAR (el socio, desde el enlace del correo) ============ -->
+  <section id="view-cancelar" class="view hidden">
+    <div class="confirmacion-box">
+      <p id="cancelar-cargando" class="loading">Buscando tu cita...</p>
+
+      <!-- Enlace inválido, ya usado, o cita fuera de plazo -->
+      <div id="cancelar-aviso" class="hidden">
+        <div class="cancel-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16.5v.01"/></svg></div>
+        <h2 id="cancelar-aviso-titulo">Este enlace ya no sirve</h2>
+        <p class="nota" id="cancelar-aviso-texto"></p>
+        <button class="btn-primary" data-back="home">Ir al inicio</button>
+      </div>
+
+      <!-- La cita se puede cancelar: se muestra y se pide confirmación -->
+      <div id="cancelar-detalle" class="hidden">
+        <h2>¿Cancelar tu cita?</h2>
+        <p class="nota" id="cancelar-saludo"></p>
+        <div class="conf-card">
+          <div class="conf-card__date">
+            <span class="conf-card__daynum" id="cancelar-day"></span>
+            <span class="conf-card__mon" id="cancelar-mon"></span>
+          </div>
+          <div class="conf-card__body">
+            <strong>Asesoría nutricional</strong>
+            <span id="cancelar-detalle-texto"></span>
+            <span>Hora de Perú (GMT−5)</span>
+          </div>
+        </div>
+        <p class="conf-loc">
+          <span class="gcal-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-5.5 7-11a7 7 0 0 0-14 0c0 5.5 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg></span>
+          <span><strong id="cancelar-sede"></strong><br><small id="cancelar-direccion"></small></span>
+        </p>
+        <hr class="booking__hr" />
+        <p class="nota">Si la cancelas, el horario queda libre para otra persona. Esto no se puede deshacer.</p>
+        <p id="cancelar-error" class="error-text hidden"></p>
+        <div class="cancelar-acciones">
+          <button type="button" id="cancelar-confirmar" class="btn-cancelar">Sí, cancelar mi cita</button>
+          <button type="button" class="btn-primary" data-back="home">No, mantenerla</button>
+        </div>
+      </div>
+
+      <!-- Ya quedó cancelada -->
+      <div id="cancelar-listo" class="hidden">
+        <div class="check-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 13l4 4L19 7"/></svg></div>
+        <h2>Tu cita quedó cancelada</h2>
+        <p class="nota">Avisamos al equipo de BioFit y el horario volvió a quedar libre. Si quieres, puedes reservar otro momento cuando gustes.</p>
+        <button class="btn-primary" data-back="home">Reservar otra cita</button>
+      </div>
+    </div>
+  </section>
+
   <!-- ============ LOGIN ============ -->
   <section id="view-admin-login" class="view hidden">
     <div class="login-wrap">

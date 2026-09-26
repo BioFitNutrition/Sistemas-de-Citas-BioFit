@@ -34,6 +34,7 @@ MODULOS = [
     "panel.js",
     "usuarios.js",
     "notificaciones.js",
+    "cancelar.js",
     "main.js",
 ]
 

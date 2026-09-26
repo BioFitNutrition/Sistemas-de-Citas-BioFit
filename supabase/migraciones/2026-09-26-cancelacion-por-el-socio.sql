@@ -213,7 +213,9 @@ end $$;
 -- puerta que se le abre, y solo se pasa con el token.
 revoke all on function cita_por_token(text)            from public;
 revoke all on function cancelar_cita_por_token(text)   from public;
-revoke all on function nuevo_token_cancelacion()       from public, anon;
+-- Nadie la llama por RPC: solo se usa como DEFAULT de la columna. Se corrio
+-- despues de la migracion, porque `authenticated` habia quedado con permiso.
+revoke all on function nuevo_token_cancelacion()       from public, anon, authenticated;
 grant execute on function cita_por_token(text)          to anon, authenticated;
 grant execute on function cancelar_cita_por_token(text) to anon, authenticated;
 

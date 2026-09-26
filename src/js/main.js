@@ -9,6 +9,7 @@ import { initClientFlow } from "./client.js";
 import { initPanel, entrarAlPanel, salirDelPanel } from "./panel.js";
 import { initUsuarios, prepararUsuarios } from "./usuarios.js";
 import { initNotificaciones, prepararNotificaciones } from "./notificaciones.js";
+import { initCancelacion, tokenDeCancelacion, abrirCancelacion } from "./cancelar.js";
 
 document.getElementById("year").textContent = new Date().getFullYear();
 
@@ -22,6 +23,7 @@ async function arrancar() {
   initPanel();
   initUsuarios();
   initNotificaciones();
+  initCancelacion();
 
   document.getElementById("btn-admin-login").addEventListener("click", () => {
     showView("view-admin-login");
@@ -33,6 +35,15 @@ async function arrancar() {
 
   document.getElementById("form-login").addEventListener("submit", onLogin);
   document.getElementById("btn-logout").addEventListener("click", onLogout);
+
+  // El enlace de cancelación manda: si el socio llegó por ahí, esa es la
+  // pantalla, y no se sigue con el arranque normal. Va antes de cargarPerfil()
+  // porque el socio no tiene sesión y no hay nada que esperar.
+  const token = tokenDeCancelacion();
+  if (token) {
+    await abrirCancelacion(token);
+    return;
+  }
 
   // Si ya había sesión abierta (recargó la página estando dentro), entra directo.
   const perfil = await cargarPerfil();

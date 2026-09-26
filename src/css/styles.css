@@ -616,6 +616,40 @@ select:disabled { opacity: 0.55; cursor: not-allowed; box-shadow: none; }
   margin: 0 auto 16px;
 }
 .check-icon svg { width: 30px; height: 30px; }
+
+/* Cancelación por parte del socio */
+.cancel-icon {
+  width: 60px; height: 60px;
+  border-radius: 50%;
+  background: transparent;
+  border: 2px solid var(--color-danger);
+  color: var(--color-danger);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 16px;
+}
+.cancel-icon svg { width: 30px; height: 30px; }
+
+/* El botón destructivo NO es el primario: el que se ve primero es "mantenerla".
+   En móvil se apilan, y "mantenerla" queda arriba por la misma razón. */
+.cancelar-acciones {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 10px;
+  margin-top: 8px;
+}
+.btn-cancelar {
+  padding: 14px 24px;
+  border: 1px solid var(--color-danger);
+  border-radius: 999px;
+  background: var(--color-danger-light);
+  color: var(--color-danger);
+  font-size: 1rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+.btn-cancelar:hover:not(:disabled) { background: var(--color-danger); color: #fff; }
+.btn-cancelar:disabled { opacity: 0.6; cursor: default; }
 .nota { color: var(--color-text-muted); font-size: 0.9rem; margin: 16px 0 24px; }
 
 /* Admin */

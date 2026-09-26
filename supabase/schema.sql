@@ -23,7 +23,7 @@
 
 -- ---- Sedes (3 filas) ----
 create table sedes (
-  id         text primary key,      -- 'magdalena' | 'jesus_maria'
+  id         text primary key,      -- 'magdalena' | 'jesus_maria' | 'lince'
   nombre     text not null,
   direccion  text,
   color      text,                  -- color distintivo de la sede
@@ -253,7 +253,7 @@ $$;
 -- hora local se convierte a un instante real antes de restar:
 --     limite := ((fecha + hora) at time zone 'America/Lima') - interval '2 hours'
 
-revoke all on function nuevo_token_cancelacion() from public, anon;
+revoke all on function nuevo_token_cancelacion() from public, anon, authenticated;
 revoke all on function cita_por_token(text), cancelar_cita_por_token(text) from public;
 grant execute on function cita_por_token(text), cancelar_cita_por_token(text)
   to anon, authenticated;

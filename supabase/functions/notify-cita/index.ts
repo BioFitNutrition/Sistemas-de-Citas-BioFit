@@ -27,6 +27,11 @@ const GMAIL_USER = Deno.env.get("GMAIL_USER") ?? "";
 const GMAIL_APP_PASSWORD = Deno.env.get("GMAIL_APP_PASSWORD") ?? "";
 const WEBHOOK_SECRET = Deno.env.get("WEBHOOK_SECRET");
 
+// Dónde vive la página del socio. Se usa para el enlace de cancelación del
+// correo. BioFit no tiene dominio propio, así que es la URL de GitHub Pages.
+// Si algún día se compra un dominio, se cambia acá y se redespliega.
+const SITIO_URL = "https://biofitnutrition.github.io/Sistemas-de-Citas-BioFit/";
+
 const db = createClient(SUPABASE_URL, SERVICE_ROLE);
 
 function esc(v: unknown): string {
@@ -68,6 +73,21 @@ function plantilla(titulo: string, cuerpo: string): string {
 
 function filaDato(etiqueta: string, valor: string): string {
   return `<p style="margin:0 0 8px;font-size:14px;color:#171a1c"><strong style="color:#6b7280;font-weight:600">${etiqueta}:</strong> ${valor}</p>`;
+}
+
+// El botón de cancelar que ve el socio. Lleva el TOKEN, nunca el id de la cita:
+// los uuid no son secretos y con el id cualquiera cancelaría citas ajenas.
+// Sin token no se pinta nada: es lo que pasa con las citas anteriores al
+// 26/09/2026 si alguien reenvía un correo viejo a mano.
+function botonCancelar(token: string | null | undefined): string {
+  if (!token) return "";
+  const enlace = `${SITIO_URL}?cancelar=${encodeURIComponent(token)}`;
+  return `
+    <hr style="border:none;border-top:1px solid #e3e6e4;margin:20px 0" />
+    <p style="margin:0 0 12px;font-size:13px;color:#6b7280">¿No vas a poder venir? Cancélala tú mismo hasta 2 horas antes, así el horario queda libre para otra persona.</p>
+    <p style="margin:0"><a href="${enlace}" style="display:inline-block;padding:11px 22px;border-radius:999px;border:1px solid #dc2626;color:#dc2626;text-decoration:none;font-size:14px;font-weight:600">Cancelar mi cita</a></p>
+    <p style="margin:12px 0 0;font-size:11px;color:#9ca3af">Este enlace es solo tuyo y deja de servir apenas lo uses.</p>
+  `;
 }
 
 // ⚠️ NO QUITAR: esto es lo que arregla los "=20" que salían dentro del correo.
@@ -219,7 +239,8 @@ async function citaNueva(cita: Record<string, any>) {
       ${filaDato("Cuándo", esc(cuando))}
       ${filaDato("Dónde", esc(sede.nombre))}
       ${sede.direccion ? filaDato("Dirección", esc(sede.direccion)) : ""}
-      <p style="margin:16px 0 0;font-size:13px;color:#6b7280">Si necesitas reprogramar o cancelar, contáctanos directamente. ¡Te esperamos!</p>
+      <p style="margin:16px 0 0;font-size:13px;color:#6b7280">Si necesitas reprogramar, contáctanos directamente. ¡Te esperamos!</p>
+      ${botonCancelar(cita.token_cancelacion)}
     `);
     await enviarCorreo([cita.email_cliente], `Tu cita en BioFit — ${cuando}`, html);
   }
