@@ -29,7 +29,7 @@ Todo lo demás está aplicado, construido, subido y verificado.
 
 ## 2. Cambios en la base
 
-Dos, las dos ya corridas y verificadas.
+Tres, las tres ya corridas y verificadas.
 
 ### a) `citas_visibles_por_sede` — políticas RLS de `citas`
 
@@ -75,6 +75,17 @@ del `output=embed` **no** trae `X-Frame-Options` en la respuesta final, igual qu
 las dos que ya funcionan. Si algún día consigues las coordenadas exactas, se
 cambian con un `UPDATE` y el frontend las toma solo.
 
+### c) El nombre del admin iba mal escrito
+
+`perfiles.nombre` decía **"Luis Villayzán"**. Es **"Villayzan"**, sin tilde.
+Corregido en la base y en `CLAUDE.md` y `README.md`, que eran los otros dos
+lugares donde aparecía. No salía en ningún correo ni en el `index.html`.
+
+```sql
+update perfiles set nombre = 'Luis Villayzan'
+where email = 'biofit.consulting1@gmail.com';
+```
+
 ---
 
 ## 3. Qué cambió en el frontend
@@ -99,15 +110,20 @@ antes era el secundario, con borde.
 Pasaron de link plano a pastilla blanca con sombra, flecha en SVG y un hover que
 desliza la flecha. La palabra queda como estaba: **"Volver"**, no "VOLVER".
 
+El **"Volver" de la barra negra** (el de la pantalla de login) seguía siendo
+texto suelto al lado de "Team Enterprise". Ahora es la misma pastilla fantasma
+que su vecina, con la misma flecha. Con eso, `.link-btn` quedó sin usarse.
+
 ### 🖼️ Foto de fondo
 
 `src/assets/portada-biofit.jpg` (Plaza Mayor de Lima) detrás de todo, bajo una
-capa del color de fondo al **95,5 %**: se intuye, no se impone. Primero quedó al
-93 % y se notaba demasiado; está bajada a propósito.
+capa del color de fondo al **90 %**. Ese número se movió tres veces a pedido de
+Christopher: 93 % → 95,5 % (se notaba demasiado) → **90 %**, que es donde quedó.
+Es el único valor que hay que tocar si se quiere más o menos foto.
 
 ⚠️ **La foto original pesaba 2,2 MB y `build.py` incrusta las imágenes como data
 URI.** Tal cual, hubiera dejado el `index.html` en ~3,8 MB. Se redujo a 1100 px y
-calidad 55 → 131 KB. El `index.html` quedó en **967 KB** (antes 790 KB).
+calidad 55 → 131 KB. El `index.html` quedó en **968 KB** (antes 790 KB).
 
 También se arregló `data_uri()` en `build.py`: mandaba `image/png` para todo, sin
 mirar la extensión.

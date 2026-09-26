@@ -1,7 +1,7 @@
 # BioFit — Sistema de Citas
 
 Sistema de agenda para las asesorías nutricionales de **BioFit Consulting**
-(Luis Villayzán), en las sedes de Magdalena del Mar y Jesús María.
+(Luis Villayzan), en las sedes de Magdalena del Mar y Jesús María.
 
 Reemplaza los links de Google Calendar Appointment Schedules por una sola URL
 propia con la marca de BioFit. Todo corre en planes gratuitos.

@@ -23,7 +23,7 @@ desactualizado, el otro lado trabaja con información falsa.
 ## Qué es este proyecto
 
 Sistema de citas para **BioFit Consulting**, consultora de asesoría nutricional en
-Lima, Perú. Cliente: **Luis Villayzán**.
+Lima, Perú. Cliente: **Luis Villayzan**.
 
 Reemplaza los links de Google Calendar Appointment Schedules que usaba antes, con
 una sola URL propia y con la marca de BioFit.

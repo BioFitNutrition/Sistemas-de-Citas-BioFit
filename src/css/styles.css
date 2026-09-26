@@ -32,7 +32,7 @@ body {
   margin: 0;
   font-family: var(--font);
   background:
-    linear-gradient(rgba(247, 248, 247, 0.955), rgba(247, 248, 247, 0.955)),
+    linear-gradient(rgba(247, 248, 247, 0.90), rgba(247, 248, 247, 0.90)),
     url("assets/portada-biofit.jpg") center / cover no-repeat;
   background-color: var(--color-bg);
   color: var(--color-text);
@@ -840,6 +840,8 @@ body {
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 .btn-pill:active { transform: scale(0.97); }
+#btn-topbar-back .btn-pill__ico { transition: transform 0.15s ease; }
+#btn-topbar-back:hover .btn-pill__ico { transform: translateX(-2px); }
 .btn-pill__ico { flex-shrink: 0; }
 
 /* Sobre el header negro: contorno crema que al pasar el mouse se llena de teal. */
