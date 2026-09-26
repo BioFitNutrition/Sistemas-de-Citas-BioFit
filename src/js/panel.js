@@ -147,11 +147,12 @@ export async function cargarCitas() {
   const listEl = document.getElementById("citas-list");
   listEl.innerHTML = '<p class="loading">Cargando citas...</p>';
 
-  // El trabajador ve las citas de SU SEDE, sin filtro propio: su selector está
-  // oculto y aquí se ignora a propósito. Quién ve qué lo decide RLS en la base.
-  const filtro = esTrabajador()
-    ? "todas"
-    : document.getElementById("filtro-sede-citas").value;
+  // BUG que estuvo en produccion: esto quedaba fijado en "todas" para el
+  // trabajador, herencia de cuando sus citas podian ser de cualquier sede (la
+  // delegacion). Con el selector ya visible para quien tiene varias sedes, el
+  // resultado era un combo que no filtraba nada. Ahora vale para todos; RLS
+  // sigue siendo lo que de verdad decide que citas le llegan.
+  const filtro = document.getElementById("filtro-sede-citas").value;
 
   let query = supabase
     .from("citas")

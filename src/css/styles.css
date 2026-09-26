@@ -100,6 +100,43 @@ body {
 .hero h1 { font-size: 1.8rem; margin-bottom: 8px; }
 .subtitle { color: var(--color-text-muted); margin-bottom: 32px; }
 
+/* ============================================
+   SELECTS — uno solo para todo el sistema
+   El <select> nativo se dibuja distinto en cada navegador (y en Windows queda
+   gris y cuadrado), así que se le apaga la apariencia y se le pone flecha
+   propia. Ojo: con `appearance:none` el hueco de la flecha lo da el padding
+   derecho — si alguna regla de abajo pisa el `padding` completo, el texto se
+   mete debajo de la flecha.
+   ============================================ */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  max-width: 100%;
+  padding: 9px 34px 9px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background-color: var(--color-surface);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  background-size: 14px 14px;
+  font-family: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--color-text);
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+select:hover { border-color: var(--color-primary); }
+select:focus-visible {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(20, 115, 98, 0.18);
+}
+select:disabled { opacity: 0.55; cursor: not-allowed; box-shadow: none; }
+
 .btn-primary {
   background: var(--color-primary);
   color: #fff;
@@ -491,7 +528,7 @@ body {
 /* Formulario */
 .form-stack { display: flex; flex-direction: column; gap: 16px; margin-top: 16px; }
 .form-stack label { display: flex; flex-direction: column; gap: 6px; font-size: 0.9rem; font-weight: 600; color: var(--color-text-muted); }
-.form-stack input, .form-stack select {
+.form-stack input {
   padding: 12px 14px;
   border: 1px solid var(--color-border);
   border-radius: 10px;
@@ -538,13 +575,12 @@ body {
 
 .filter-row { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
 .filter-row label { font-size: 0.85rem; color: var(--color-text-muted); font-weight: 600; display: flex; align-items: center; gap: 6px; }
-.filter-row select { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--color-border); }
 
 .realtime-indicator { font-size: 0.8rem; color: var(--color-accent); font-weight: 600; }
 
 .inline-form { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; margin-bottom: 20px; }
 .inline-form label { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; color: var(--color-text-muted); font-weight: 600; }
-.inline-form input, .inline-form select { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--color-border); }
+.inline-form input { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--color-border); }
 
 .citas-list, .horarios-list { display: flex; flex-direction: column; gap: 10px; }
 .citas-list { gap: 24px; }
@@ -1012,17 +1048,6 @@ body {
   font-weight: 700;
   color: var(--color-text-muted);
 }
-.alta__sede select {
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  font-family: inherit;
-  font-size: 0.92rem;
-  font-weight: 600;
-  color: var(--color-text);
-}
-.alta__sede select:focus { outline: 2px solid var(--color-primary); border-color: transparent; }
 .alta__hint { margin: 0; font-size: 0.78rem; color: var(--color-text-muted); line-height: 1.45; }
 .alta__nota { margin: 0; font-size: 0.82rem; color: var(--color-text-muted); line-height: 1.45; }
 
@@ -1038,17 +1063,8 @@ body {
 
 /* Los tres selectores de una hora, pegados como un solo control. */
 .hora-sel { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.hora-sel select {
-  padding: 9px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  font-family: inherit;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--color-text);
-}
-.hora-sel select:focus { outline: 2px solid var(--color-primary); border-color: transparent; }
+/* Los de la hora van más angostos: son tres seguidos y no deben desbordar. */
+.hora-sel select { padding-right: 30px; padding-left: 10px; background-position: right 9px center; }
 .hora-sel__sep { font-weight: 700; color: var(--color-text-muted); }
 
 /* El recuento que aparece antes de guardar: "Vas a crear 36 horarios en 3 días" */
