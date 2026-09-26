@@ -10,7 +10,7 @@ import { supabase } from "./supabaseClient.js";
 import { SUPABASE_URL } from "./config.js";
 import { esAdmin } from "./auth.js";
 import { showToast, escapeHtml, setLoading } from "./utils.js";
-import { llenarSelectSedes, nombreSede, getSedes } from "./sedes.js";
+import { llenarSelectSedes, nombreSede, getSedes, TODAS_LAS_SEDES } from "./sedes.js";
 import { cargarCitas } from "./panel.js";
 import { cargarNotificaciones } from "./notificaciones.js";
 
@@ -23,7 +23,7 @@ export async function prepararUsuarios() {
   if (!esAdmin()) return;
   llenarSelectSedes(document.getElementById("nuevo-usuario-sede"), {
     incluirTodas: false,
-    incluirAmbas: true,
+    incluirTodasLasSedes: true,
   });
   await cargarUsuarios();
 }
@@ -83,8 +83,8 @@ function renderUsuario(u) {
 
     const sel = document.createElement("select");
     sel.className = "select-sede-usuario";
-    llenarSelectSedes(sel, { incluirAmbas: true });
-    sel.value = u.sede_id ?? "ambas";
+    llenarSelectSedes(sel, { incluirTodasLasSedes: true });
+    sel.value = u.sede_id ?? TODAS_LAS_SEDES;
     sel.addEventListener("change", () => cambiarSedeUsuario(u, sel));
     fila.appendChild(sel);
     info.appendChild(fila);
@@ -144,7 +144,7 @@ async function alternarUsuario(u, activo) {
 
 // Cambia la sede del trabajador y arrastra con ella sus correos de aviso.
 async function cambiarSedeUsuario(u, select) {
-  const elegida = select.value === "ambas" ? null : select.value;
+  const elegida = select.value === TODAS_LAS_SEDES ? null : select.value;
   if (elegida === (u.sede_id ?? null)) return;
 
   select.disabled = true;
@@ -153,7 +153,7 @@ async function cambiarSedeUsuario(u, select) {
   if (error) {
     showToast("No se pudo cambiar la sede.", "error");
     console.error(error);
-    select.value = u.sede_id ?? "ambas";
+    select.value = u.sede_id ?? TODAS_LAS_SEDES;
     select.disabled = false;
     return;
   }
@@ -175,7 +175,7 @@ async function cambiarSedeUsuario(u, select) {
 
 // ---------- correos de aviso atados a la sede del trabajador ----------
 // Regla: un trabajador ACTIVO recibe los avisos de la sede que gestiona, y los
-// de las dos si gestiona ambas. Uno inactivo no recibe ninguno. Esta función
+// de todas si las gestiona todas. Uno inactivo no recibe ninguno. Esta función
 // deja `notificaciones_sede` exactamente así para ese correo, sin tocar los
 // correos de nadie más (el Gmail de BioFit, el personal de Luis, etc.).
 
@@ -245,8 +245,8 @@ async function onCrearUsuario(e) {
     email: fd.get("email").trim(),
     password: fd.get("password"),
     nombre: fd.get("nombre").trim(),
-    // "ambas" viaja como null: es la convención de la base para "todas las sedes".
-    sede_id: sede === "ambas" ? null : sede,
+    // Viaja como null: es la convención de la base para "todas las sedes".
+    sede_id: sede === TODAS_LAS_SEDES ? null : sede,
   };
 
   if (payload.password.length < 8) {

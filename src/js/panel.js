@@ -73,7 +73,7 @@ export async function entrarAlPanel() {
 
   // HORARIOS: aquí el filtro por sede sí tiene sentido y se queda. Quien tiene
   // una sede fija queda amarrado a ella; el admin y el trabajador que cubre
-  // todas pueden alternar entre las dos.
+  // todas pueden alternar entre ellas.
   const opcionesHorarios = miSedeFija
     ? { incluirTodas: false, soloSede: miSedeFija }
     : { incluirTodas: true };
@@ -87,7 +87,7 @@ export async function entrarAlPanel() {
   // Un selector de una sola opción no le sirve a nadie: se oculta únicamente a
   // quien tiene sede fija. Ojo: `.filter-row__sede` también envuelve el selector
   // del formulario de agregar horario, que es justo el que el trabajador de
-  // ambas sedes necesita ver para elegir dónde crea el horario.
+  // todas las sedes necesita ver para elegir dónde crea el horario.
   document.querySelectorAll("#tab-horarios .filter-row__sede").forEach((el) => {
     el.classList.toggle("hidden", Boolean(miSedeFija));
   });
@@ -236,7 +236,7 @@ function renderCita(cita) {
     : cita.telefono_cliente;
   info.appendChild(contacto);
 
-  // Chip de sede con su color: el trabajador puede tener ambas sedes.
+  // Chip de sede con su color: el trabajador puede tener todas las sedes.
   const chips = document.createElement("div");
   chips.className = "card-row__chips";
   chips.appendChild(chipSede(cita.sede_id));

@@ -190,10 +190,14 @@ Esto SÍ requiere tocar la base de datos — coordinarlo antes de implementarlo.
 
 ---
 
-## 8. Sedes del trabajador: selección múltiple (a futuro)
+## 8. Sedes del trabajador: selección múltiple — ⚠️ YA LLEGÓ EL CASO
+
+> **El 25/09/2026 se abrió la tercera sede (Lince).** Esto dejaba de ser "a
+> futuro" justo en este punto: hoy un trabajador solo puede cubrir UNA sede o
+> LAS TRES. Si Luis quiere a alguien en Magdalena y Jesús María pero no en
+> Lince, hoy **no se puede expresar**. Falta decidir si hace falta ya.
 
 Hoy un trabajador puede ser de **una sede** o de **todas** (`sede_id = NULL`).
-Para 2 sedes alcanza perfecto.
 
 A futuro, Luis quiere poder elegir **sedes específicas** — por ejemplo, alguien
 que cubra 2 de 3 sedes. Eso ya no cabe en una sola columna.
@@ -203,8 +207,9 @@ con `perfil_id` + `sede_id`) para la relación muchos-a-muchos, y reescribir las
 políticas RLS de `horarios_disponibles` para que consulten esa tabla en vez de
 comparar contra `mi_sede()`.
 
-**No hacerlo todavía.** Mientras BioFit tenga 2 sedes, el modelo actual
-(una o todas) cubre todos los casos reales. Anotado para cuando abran una tercera.
+**Ya no es hipotético.** Con 3 sedes el modelo (una o todas) deja fuera un caso
+real: cubrir dos de tres. No urge mientras nadie lo pida, pero el día que Luis lo
+pida, es tabla intermedia + reescribir RLS — no es un cambio de una tarde.
 
 ---
 

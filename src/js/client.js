@@ -40,6 +40,7 @@ function columnasVisibles() {
 
 export function initClientFlow() {
   renderSedeGrid();
+  pintarSedesDePortada();
 
   document.getElementById("gcal-duracion").textContent = String(DURACION_CITA_MIN);
   document.getElementById("gcal-servicio").textContent = NOMBRE_SERVICIO;
@@ -108,6 +109,17 @@ function entrarAlFlujo(esNuevo) {
   document.getElementById("conf-nuevo").classList.toggle("hidden", !esNuevo);
 
   showView("view-sede");
+}
+
+// "Magdalena del Mar, Jesús María y Lince" — armado desde la base. La portada
+// no puede nombrar sedes a mano: al abrir una nueva el texto quedaría mintiendo.
+function pintarSedesDePortada() {
+  const host = document.getElementById("hero-sedes");
+  const nombres = getSedes().map((s) => s.nombre.replace(/^Sede\s+/i, ""));
+  if (!host || nombres.length === 0) return;
+  host.textContent = nombres.length === 1
+    ? nombres[0]
+    : `${nombres.slice(0, -1).join(", ")} y ${nombres[nombres.length - 1]}`;
 }
 
 // Las sedes vienen de la base, con su color.

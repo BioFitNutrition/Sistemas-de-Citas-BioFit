@@ -10,6 +10,10 @@ import { supabase } from "./supabaseClient.js";
 import { COLOR_SEDE_DEFECTO } from "./config.js";
 import { colorLegible, colorSuave } from "./utils.js";
 
+// Valor centinela del <select> para "no atado a una sola sede". Nunca llega a la
+// base: al guardar se traduce a NULL, que es como la base dice "todas".
+export const TODAS_LAS_SEDES = "todas_las_sedes";
+
 let _sedes = [];
 
 export async function cargarSedes() {
@@ -62,12 +66,12 @@ export function mapsUrlSede(sedeId) {
 
 // Pinta un <select> con las sedes disponibles.
 // `incluirTodas` agrega la opción "Todas" al inicio: sirve para FILTRAR una lista.
-// `incluirAmbas` agrega "Ambas sedes" al inicio: sirve para ELEGIR al crear algo
-//   (un correo que recibe los avisos de las dos sedes, un trabajador que cubre
-//   las dos). Son cosas distintas, por eso son dos opciones y no una.
+// `incluirTodasLasSedes` agrega "Todas las sedes" al inicio: sirve para ELEGIR
+//   al crear algo (un correo que recibe los avisos de todas, un trabajador que
+//   las cubre todas). Son cosas distintas, por eso son dos opciones y no una.
 export function llenarSelectSedes(
   select,
-  { incluirTodas = false, incluirAmbas = false, soloSede = null } = {}
+  { incluirTodas = false, incluirTodasLasSedes = false, soloSede = null } = {}
 ) {
   if (!select) return;
   select.innerHTML = "";
@@ -79,10 +83,10 @@ export function llenarSelectSedes(
     select.appendChild(opt);
   }
 
-  if (incluirAmbas) {
+  if (incluirTodasLasSedes) {
     const opt = document.createElement("option");
-    opt.value = "ambas";
-    opt.textContent = "Ambas sedes";
+    opt.value = TODAS_LAS_SEDES;
+    opt.textContent = "Todas las sedes";
     select.appendChild(opt);
   }
 
@@ -117,6 +121,6 @@ function armarChip(texto, color) {
 
 // Chip para quien no está atado a una sola sede (sede_id = NULL en la base).
 // No puede usar chipSede(null): no hay nombre ni color que leer.
-export function chipAmbasSedes() {
-  return armarChip("Ambas sedes", COLOR_SEDE_DEFECTO);
+export function chipTodasLasSedes() {
+  return armarChip("Todas las sedes", COLOR_SEDE_DEFECTO);
 }

@@ -7,7 +7,7 @@
 import { supabase } from "./supabaseClient.js";
 import { esAdmin } from "./auth.js";
 import { showToast, setLoading, emailValido } from "./utils.js";
-import { llenarSelectSedes, chipSede, getSedes, nombreSede } from "./sedes.js";
+import { llenarSelectSedes, chipSede, getSedes, nombreSede, TODAS_LAS_SEDES } from "./sedes.js";
 
 export function initNotificaciones() {
   const form = document.getElementById("form-nueva-notificacion");
@@ -18,7 +18,7 @@ export async function prepararNotificaciones() {
   if (!esAdmin()) return;
   llenarSelectSedes(document.getElementById("nueva-notificacion-sede"), {
     incluirTodas: false,
-    incluirAmbas: true,
+    incluirTodasLasSedes: true,
   });
   await cargarNotificaciones();
 }
@@ -125,10 +125,10 @@ async function onAgregarCorreo(e) {
     return;
   }
 
-  // "ambas" no es una sede: es el atajo para no tener que agregar el mismo
+  // "todas las sedes" no es una sede: es el atajo para no agregar el mismo
   // correo una vez por sede. Se expande a las sedes que haya en la base.
-  const eligioAmbas = fd.get("sede") === "ambas";
-  const destinos = eligioAmbas ? getSedes().map((s) => s.id) : [fd.get("sede")];
+  const eligioTodas = fd.get("sede") === TODAS_LAS_SEDES;
+  const destinos = eligioTodas ? getSedes().map((s) => s.id) : [fd.get("sede")];
 
   if (destinos.length === 0) {
     errorEl.textContent = "No se pudieron leer las sedes. Recarga la página.";
@@ -169,7 +169,7 @@ async function onAgregarCorreo(e) {
 
   // Nada que insertar porque ya estaba en todas: es un aviso, no un error.
   if (agregadas.length === 0) {
-    if (eligioAmbas) {
+    if (eligioTodas) {
       showToast("Ese correo ya estaba en todas las sedes.");
     } else {
       errorEl.textContent = "Ese correo ya está configurado para esta sede.";
@@ -183,7 +183,7 @@ async function onAgregarCorreo(e) {
   let mensaje;
   if (yaEstaban.length > 0) {
     mensaje = `Agregado a ${listarSedes(agregadas)} (ya estaba en ${listarSedes(yaEstaban)}).`;
-  } else if (eligioAmbas) {
+  } else if (eligioTodas) {
     mensaje = `Correo agregado a ${listarSedes(agregadas)}.`;
   } else {
     mensaje = "Correo agregado.";

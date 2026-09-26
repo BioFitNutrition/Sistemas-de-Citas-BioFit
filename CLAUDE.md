@@ -29,7 +29,7 @@ Reemplaza los links de Google Calendar Appointment Schedules que usaba antes, co
 una sola URL propia y con la marca de BioFit.
 
 - Citas de **20 minutos**
-- **2 sedes**, ubicadas dentro de gimnasios XFLY: Magdalena del Mar y Jesús María
+- **3 sedes**, ubicadas dentro de gimnasios XFLY: Magdalena del Mar, Jesús María y Lince
 - Volumen bajo: ~30 clientes, 7-10 citas por semana
 - **Restricción dura: todo debe mantenerse en planes gratuitos** (Supabase free,
   GitHub Pages, Gmail). BioFit no tiene dominio propio.
@@ -58,7 +58,7 @@ con un límite de ~500 correos/día (de sobra para este volumen).
 | Actor | ¿Inicia sesión? | Qué puede hacer |
 |---|---|---|
 | **Cliente / socio** | **No.** Acceso anónimo | Solo reservar una cita desde la web pública. No tiene registro, ni credenciales, ni panel. No construir login para él. |
-| **Trabajador** | Sí | Ve y edita **las citas de su sede** (o de ambas si su `sede_id` es NULL). Gestiona horarios **solo de su sede**. Recibe por correo los avisos de su sede. |
+| **Trabajador** | Sí | Ve y edita **las citas de su sede** (o de todas si su `sede_id` es NULL). Gestiona horarios **solo de su sede**. Recibe por correo los avisos de su sede. |
 | **Administrador** (Luis) | Sí | Control total: citas, horarios, usuarios, configuración de correos, y delegar citas a trabajadores. |
 
 ---
@@ -81,10 +81,10 @@ con un límite de ~500 correos/día (de sobra para este volumen).
 ### `sedes`
 | Columna | Tipo | Notas |
 |---|---|---|
-| `id` | text PK | `magdalena` \| `jesus_maria` |
-| `nombre` | text | `Sede Magdalena del Mar` · `Sede Jesús María` |
+| `id` | text PK | `magdalena` \| `jesus_maria` \| `lince` |
+| `nombre` | text | `Sede Magdalena del Mar` · `Sede Jesús María` · `Sede Lince` |
 | `direccion` | text | dirección de calle real |
-| `color` | text | `#16a34a` verde (Magdalena) · `#eab308` amarillo (Jesús María) |
+| `color` | text | `#16a34a` verde (Magdalena) · `#eab308` amarillo (Jesús María) · `#147362` teal del logo (Lince) |
 | `mapa_embed` | text | URL para el `<iframe>` del mini mapa |
 | `maps_url` | text | link para el botón "Cómo llegar" |
 
@@ -93,9 +93,16 @@ muda de local, se cambia la fila y listo — no se toca código ni se hace deplo
 
 Valores reales hoy:
 
-| | Magdalena | Jesús María |
-|---|---|---|
-| Dirección | Av. del Ejército 1360, Magdalena del Mar | Av. General Garzón 1123, Jesús María |
+| | Magdalena | Jesús María | Lince |
+|---|---|---|---|
+| Dirección | Av. del Ejército 1360, Magdalena del Mar | Av. General Garzón 1123, Jesús María | Av. Petit Thouars 1860, Lince |
+
+⚠️ **Lince no lleva coordenadas, lleva el nombre del local.** De las otras dos
+se conocen lat/lng; del link que pasó Christopher no salían, y un pin inventado
+manda al socio a la cuadra equivocada. Así que sus dos URLs buscan
+`XFLY Lince, Av. Petit Thouars 1860` en texto y deja que Google lo resuelva.
+Verificado: las dos responden 200 y el `output=embed` no trae `X-Frame-Options`
+en la respuesta final, igual que las que ya funcionan.
 
 ⚠️ **Los mapas NO usan API key de Google, a propósito.** La Maps Embed API oficial
 exige una cuenta de facturación con tarjeta, y este proyecto no puede tener eso.
@@ -136,7 +143,7 @@ Correos que reciben el aviso interno cuando entra una cita. Varios por sede,
 editables desde el panel por el admin.
 
 ⚠️ **Los correos de los trabajadores los administra la pestaña Usuarios, no la
-de Correos.** Al crear un trabajador se le da de alta en su sede (o en las dos);
+de Correos.** Al crear un trabajador se le da de alta en su sede (o en todas);
 al cambiarle la sede o desactivarlo, sus filas se reacomodan solas. Tocarlos a
 mano desde la pestaña Correos funciona, pero el próximo cambio de sede los
 vuelve a dejar como manda la ficha del usuario. Por eso esas filas salen

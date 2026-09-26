@@ -44,10 +44,14 @@ IMPORT_SUPABASE = (
 )
 
 
+MIME = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+        ".webp": "image/webp", ".svg": "image/svg+xml"}
+
+
 def data_uri(ruta: Path) -> str:
     """Convierte una imagen a data URI base64."""
     b64 = base64.b64encode(ruta.read_bytes()).decode()
-    return f"data:image/png;base64,{b64}"
+    return f"data:{MIME[ruta.suffix.lower()]};base64,{b64}"
 
 
 # Captura imports de módulos locales ("./x.js") y del CDN de Supabase, incluidos
@@ -133,7 +137,7 @@ def main() -> int:
     )
 
     # ---- 4. Embeber imágenes ----
-    for archivo in ("favicon.png", "logo.png", "logo-full.png"):
+    for archivo in ("favicon.png", "logo.png", "logo-full.png", "portada-biofit.jpg"):
         ruta = SRC / "assets" / archivo
         if not ruta.exists():
             print(f"ERROR: falta el asset {ruta}", file=sys.stderr)
