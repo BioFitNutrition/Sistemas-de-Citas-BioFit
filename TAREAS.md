@@ -190,28 +190,24 @@ Esto SÍ requiere tocar la base de datos — coordinarlo antes de implementarlo.
 
 ---
 
-## 8. Sedes del trabajador: selección múltiple — ⚠️ YA LLEGÓ EL CASO
+## ✅ 8. Sedes del trabajador: selección múltiple — HECHO (25/09/2026)
 
-> **El 25/09/2026 se abrió la tercera sede (Lince).** Esto dejaba de ser "a
-> futuro" justo en este punto: hoy un trabajador solo puede cubrir UNA sede o
-> LAS TRES. Si Luis quiere a alguien en Magdalena y Jesús María pero no en
-> Lince, hoy **no se puede expresar**. Falta decidir si hace falta ya.
-
-Hoy un trabajador puede ser de **una sede** o de **todas** (`sede_id = NULL`).
-
-A futuro, Luis quiere poder elegir **sedes específicas** — por ejemplo, alguien
-que cubra 2 de 3 sedes. Eso ya no cabe en una sola columna.
-
-⚠️ **Implicación técnica:** requiere una tabla intermedia (ej. `perfil_sedes`
-con `perfil_id` + `sede_id`) para la relación muchos-a-muchos, y reescribir las
-políticas RLS de `horarios_disponibles` para que consulten esa tabla en vez de
-comparar contra `mi_sede()`.
-
-**Ya no es hipotético.** Con 3 sedes el modelo (una o todas) deja fuera un caso
-real: cubrir dos de tres. No urge mientras nadie lo pida, pero el día que Luis lo
-pida, es tabla intermedia + reescribir RLS — no es un cambio de una tarde.
-
----
+> Se hizo el mismo día que abrió Lince, que es lo que lo volvió urgente: con 3
+> sedes, una sola columna no podía decir "Magdalena y Jesús María pero no Lince".
+>
+> **Tabla nueva `perfil_sedes`** (una fila por sede) y **`mis_sedes()`** en vez de
+> `mi_sede()`. Se reescribieron las 4 políticas RLS que dependían de ella (citas
+> ver/editar, horarios crear/editar). `perfiles.sede_id` quedó **en desuso**.
+> Migración y SQL de reversa en `supabase/migraciones/2026-09-25-perfil-sedes.sql`.
+>
+> El admin las reparte con **checks** en la vista **Editar trabajador** de la
+> pestaña Usuarios, con su botón Guardar.
+>
+> ⚠️ **El conjunto es explícito, decidido por Christopher:** no hay un "todas"
+> que se estire solo. Al abrir una sede nueva, **nadie la gestiona** hasta que el
+> admin entre y la marque. Es más predecible, y nadie gana acceso a las citas de
+> un local sin que alguien lo decida. Si alguna vez se quiere lo contrario, es un
+> check extra que guarde "todas" como intención y no como lista.
 
 ## 9. Crear el primer trabajador y probar el aislamiento
 
@@ -224,9 +220,8 @@ real.
 Ya existen dos trabajadores de prueba en la base. Falta verificar en serio que:
 
 - Solo ve las pestañas **Citas** y **Horarios**
-- Ve **las citas de su sede**, y ninguna de la otra (o las de ambas si su
-  `sede_id` es NULL)
-- En Horarios ve únicamente los de su sede
+- Ve **las citas de las sedes que gestiona**, y ninguna de las otras
+- En Horarios ve únicamente los de esas sedes
 - No puede eliminar nada
 - Probar el caso feo: pedirle a la API una cita que NO le corresponde y confirmar
   que la base la rechaza

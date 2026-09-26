@@ -313,7 +313,9 @@ function renderSemana() {
   dias.forEach((d, idx) => {
     const iso = isoLocal(d);
     const col = document.createElement("div");
-    col.className = "gcal__daycol";
+    // La columna entera se resalta, no solo el número: en el celular se ven tres
+    // columnas juntas y el circulito solo no alcanza para saber cuál es la tuya.
+    col.className = "gcal__daycol" + (iso === state.diaSel ? " is-selected" : "");
 
     const head = document.createElement("div");
     head.className = "gcal__dayhd";

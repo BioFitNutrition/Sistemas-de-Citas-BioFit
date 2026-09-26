@@ -6,26 +6,27 @@
 // la lógica, y RLS respalda todo desde la base.
 
 import { supabase } from "./supabaseClient.js";
-import { getPerfil, esAdmin, esTrabajador, miSede } from "./auth.js";
+import { getPerfil, esAdmin, esTrabajador, misSedes } from "./auth.js";
 import {
   showView, showToast, formatearFecha, formatearHora, hoyISO, escapeHtml, setLoading,
   hhmm12, toMin, rangoHora,
 } from "./utils.js";
 import { crearCalendarioMes, serieDeHoras } from "./calendario.js";
-import { llenarSelectSedes, chipSede, nombreSede } from "./sedes.js";
+import { llenarSelectSedes, chipSede, nombreSede, getSedes } from "./sedes.js";
 import { DURACION_CITA_MIN } from "./config.js";
 
 let realtimeChannel = null;
 let altaCal = null;      // calendario de alta de horarios (modo "varios")
 let seleccionHorarios = new Set();   // ids marcados para borrar en lote (admin)
 let diasAbiertos = new Set();        // "seccion|fecha" de los días desplegados
+let citasALaVista = "activas";       // "activas" | "historial": sub-sección de Citas
 let tocoLosDias = false;             // true cuando el usuario abrió o cerró alguno
 
-// Sede a la que el usuario está amarrado, o null si puede elegir entre todas.
-// El admin siempre puede. El trabajador solo si su perfil tiene sede_id NULL,
-// que es la convención de la base para "cubre todas las sedes".
-function sedeFija() {
-  return esTrabajador() ? miSede() : null;
+// Sedes que el usuario puede gestionar. `null` = todas, y es siempre el caso
+// del admin. El trabajador tiene la lista exacta que le marcaron, que puede
+// tener una, varias, o ninguna.
+function misSedesGestionadas() {
+  return esTrabajador() ? misSedes() : null;
 }
 
 // ---------- arranque ----------
@@ -59,37 +60,41 @@ export async function entrarAlPanel() {
     el.classList.toggle("hidden", !esAdmin());
   });
 
-  const miSedeFija = sedeFija();
+  const mias = misSedesGestionadas();
+  const cuantas = mias === null ? getSedes().length : mias.length;
+  const unaSola = cuantas === 1;
 
-  // CITAS: nunca se filtran por sede para el trabajador. Sus citas son las que
-  // el admin le delegó, y pueden ser de CUALQUIER sede — su `sede_id` solo dice
-  // qué horarios gestiona, no dónde puede atender. Filtrar aquí le escondía las
-  // citas de la otra sede (el bug del punto 1 de TAREAS.md). RLS ya garantiza
-  // que solo reciba las suyas: el filtro no protegía nada.
-  llenarSelectSedes(document.getElementById("filtro-sede-citas"), { incluirTodas: true });
+  // Un trabajador sin ninguna sede marcada no ve nada, y sin este aviso el panel
+  // vacío parece un error del sistema en vez de una ficha a medio llenar.
+  document.getElementById("panel-sin-sedes").classList.toggle("hidden", cuantas !== 0);
+
+  // CITAS: ahora SÍ se filtran por sede. Antes no, porque una cita delegada podía
+  // ser de cualquier sede y el filtro se la escondía (el bug del punto 1 de
+  // TAREAS.md). Sin delegación, sus citas son exactamente las de sus sedes, y RLS
+  // ya no le entrega ninguna otra: el filtro solo ordena lo que igual puede ver.
+  llenarSelectSedes(document.getElementById("filtro-sede-citas"), {
+    incluirTodas: cuantas > 1,
+    soloSedes: mias,
+  });
   document
     .querySelector("#tab-citas .filter-row__sede")
-    .classList.toggle("hidden", esTrabajador());
+    .classList.toggle("hidden", cuantas <= 1);
 
-  // HORARIOS: aquí el filtro por sede sí tiene sentido y se queda. Quien tiene
-  // una sede fija queda amarrado a ella; el admin y el trabajador que cubre
-  // todas pueden alternar entre ellas.
-  const opcionesHorarios = miSedeFija
-    ? { incluirTodas: false, soloSede: miSedeFija }
-    : { incluirTodas: true };
-
-  llenarSelectSedes(document.getElementById("filtro-sede-horarios"), opcionesHorarios);
+  // HORARIOS: mismo criterio.
+  llenarSelectSedes(document.getElementById("filtro-sede-horarios"), {
+    incluirTodas: cuantas > 1,
+    soloSedes: mias,
+  });
   llenarSelectSedes(document.getElementById("nuevo-horario-sede"), {
     incluirTodas: false,
-    soloSede: miSedeFija,
+    soloSedes: mias,
   });
 
-  // Un selector de una sola opción no le sirve a nadie: se oculta únicamente a
-  // quien tiene sede fija. Ojo: `.filter-row__sede` también envuelve el selector
-  // del formulario de agregar horario, que es justo el que el trabajador de
-  // todas las sedes necesita ver para elegir dónde crea el horario.
+  // Un selector de una sola opción no le sirve a nadie. Ojo: `.filter-row__sede`
+  // también envuelve el selector del formulario de agregar horario, que es justo
+  // el que el trabajador de varias sedes necesita para elegir dónde lo crea.
   document.querySelectorAll("#tab-horarios .filter-row__sede").forEach((el) => {
-    el.classList.toggle("hidden", Boolean(miSedeFija));
+    el.classList.toggle("hidden", unaSola);
   });
 
   // Refresca el recuento del alta con la sede que corresponda al rol.
@@ -158,41 +163,88 @@ export async function cargarCitas() {
     .filter((c) => !(c.estado === "confirmada" && c.fecha >= hoy))
     .reverse();   // el historial se lee al revés: lo más reciente primero
 
+  // Las dos secciones se arman siempre, pero solo se muestra la elegida: con las
+  // dos a la vez había que bajar toda la lista de próximas para llegar al
+  // historial. El agrupado por día va dentro de cada una.
+  const secciones = [
+    renderSeccionCitas({
+      clave: "activas",
+      titulo: "Próximas",
+      ayuda: "Confirmadas y todavía por atender, de hoy en adelante. Toca un día para abrirlo.",
+      citas: activas,
+      vacio: "No hay citas próximas.",
+      abrirPrimero: true,
+    }),
+    renderSeccionCitas({
+      clave: "historial",
+      titulo: "Pasadas o canceladas",
+      ayuda: "Ya no requieren acción: o se canceló, o la fecha quedó atrás.",
+      citas: historial,
+      vacio: "Ninguna por ahora.",
+      // El historial arranca todo cerrado: es para consultar, no para atender.
+      abrirPrimero: false,
+    }),
+  ];
+
   listEl.innerHTML = "";
-  listEl.appendChild(renderSeccionCitas({
-    clave: "activas",
-    titulo: "Próximas",
-    ayuda: "Confirmadas y todavía por atender, de hoy en adelante.",
-    citas: activas,
-    vacio: "No hay citas próximas.",
-  }));
-  listEl.appendChild(renderSeccionCitas({
-    clave: "historial",
-    titulo: "Pasadas o canceladas",
-    ayuda: "Ya no requieren acción: o se canceló, o la fecha quedó atrás.",
-    citas: historial,
-    vacio: "Ninguna por ahora.",
-  }));
+  listEl.appendChild(renderSelectorCitas([
+    { clave: "activas", texto: "Próximas", cuantas: activas.length },
+    { clave: "historial", texto: "Pasadas o canceladas", cuantas: historial.length },
+  ]));
+  secciones.forEach((sec) => {
+    sec.classList.toggle("hidden", !sec.classList.contains("grupo--" + citasALaVista));
+    listEl.appendChild(sec);
+  });
 }
 
-function renderSeccionCitas({ clave, titulo, ayuda, citas, vacio }) {
+// Cambia entre "Próximas" e historial sin volver a consultar la base: las dos
+// listas ya están en pantalla, solo se oculta una.
+function renderSelectorCitas(opciones) {
+  const barra = document.createElement("div");
+  barra.className = "subtabs";
+  barra.setAttribute("role", "tablist");
+
+  opciones.forEach(({ clave, texto, cuantas }) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "subtab" + (clave === citasALaVista ? " active" : "");
+    btn.setAttribute("role", "tab");
+    btn.setAttribute("aria-selected", String(clave === citasALaVista));
+
+    const et = document.createElement("span");
+    et.textContent = texto;
+    btn.appendChild(et);
+
+    const n = document.createElement("span");
+    n.className = "subtab__cuenta";
+    n.textContent = String(cuantas);
+    btn.appendChild(n);
+
+    btn.addEventListener("click", () => {
+      if (citasALaVista === clave) return;
+      citasALaVista = clave;
+      const lista = document.getElementById("citas-list");
+      lista.querySelectorAll(".subtab").forEach((b) => {
+        const suya = b === btn;
+        b.classList.toggle("active", suya);
+        b.setAttribute("aria-selected", String(suya));
+      });
+      lista.querySelectorAll(".grupo").forEach((sec) => {
+        sec.classList.toggle("hidden", !sec.classList.contains("grupo--" + clave));
+      });
+    });
+
+    barra.appendChild(btn);
+  });
+
+  return barra;
+}
+
+// Sin título ni contador propios: los pone la sub-pestaña de arriba, y
+// repetirlos solo gastaba pantalla. Queda la línea de ayuda, que sí aporta.
+function renderSeccionCitas({ clave, ayuda, citas, vacio, abrirPrimero }) {
   const seccion = document.createElement("section");
   seccion.className = "grupo grupo--" + clave;
-
-  const cab = document.createElement("div");
-  cab.className = "grupo__head";
-
-  const h = document.createElement("h3");
-  h.className = "grupo__titulo";
-  h.textContent = titulo;
-  cab.appendChild(h);
-
-  const cuenta = document.createElement("span");
-  cuenta.className = "grupo__cuenta";
-  cuenta.textContent = String(citas.length);
-  cab.appendChild(cuenta);
-
-  seccion.appendChild(cab);
 
   const nota = document.createElement("p");
   nota.className = "grupo__ayuda";
@@ -207,12 +259,79 @@ function renderSeccionCitas({ clave, titulo, ayuda, citas, vacio }) {
     return seccion;
   }
 
-  const lista = document.createElement("div");
-  lista.className = "citas-list__filas";
-  citas.forEach((cita) => lista.appendChild(renderCita(cita)));
-  seccion.appendChild(lista);
+  // Agrupadas por día y desplegables, igual que los horarios. Con la lista plana
+  // había que bajar mucho para encontrar el día que se buscaba.
+  const porFecha = new Map();
+  citas.forEach((c) => {
+    if (!porFecha.has(c.fecha)) porFecha.set(c.fecha, []);
+    porFecha.get(c.fecha).push(c);
+  });
+
+  let primero = abrirPrimero;
+  porFecha.forEach((delDia, fecha) => {
+    // Dentro del día, siempre de la hora más temprana a la más tarde — también
+    // en el historial, donde el arreglo viene invertido para que los días bajen.
+    delDia.sort((a, b) => a.hora.localeCompare(b.hora));
+    seccion.appendChild(renderDiaCitas({ clave, fecha, delDia, primero }));
+    primero = false;
+  });
 
   return seccion;
+}
+
+// Un día de citas, desplegable. Cerrado ocupa una fila y ya dice lo esencial:
+// qué día es, cuántas citas hay y cuántas de esas están canceladas.
+function renderDiaCitas({ clave, fecha, delDia, primero }) {
+  const det = document.createElement("details");
+  det.className = "dia";
+
+  // Se recuerda qué días dejó abiertos el usuario, para que un recargado (por
+  // realtime, o al cancelar una cita) no se los cierre en la cara.
+  const idDia = clave + "|" + fecha;
+  det.open = tocoLosDias ? diasAbiertos.has(idDia) : Boolean(primero);
+  if (det.open) diasAbiertos.add(idDia);
+
+  det.addEventListener("toggle", () => {
+    tocoLosDias = true;
+    if (det.open) diasAbiertos.add(idDia);
+    else diasAbiertos.delete(idDia);
+  });
+
+  const sum = document.createElement("summary");
+  sum.className = "dia__sum";
+
+  const texto = document.createElement("span");
+  texto.className = "dia__fecha";
+  texto.textContent = formatearFecha(fecha);
+  sum.appendChild(texto);
+
+  const cuantas = document.createElement("span");
+  cuantas.className = "dia__cuenta";
+  cuantas.textContent = plural(delDia.length, "cita", "citas");
+  sum.appendChild(cuantas);
+
+  const canceladas = delDia.filter((c) => c.estado === "cancelada").length;
+  const franja = document.createElement("span");
+  franja.className = "dia__franja";
+  if (canceladas === delDia.length) {
+    franja.textContent = "todas canceladas";
+  } else if (canceladas > 0) {
+    franja.textContent = canceladas + " cancelada" + (canceladas === 1 ? "" : "s");
+  } else {
+    const inicio = hhmm12(toMin(delDia[0].hora), true);
+    const fin = hhmm12(toMin(delDia[delDia.length - 1].hora), true);
+    franja.textContent = delDia.length === 1 ? inicio : inicio + " – " + fin;
+  }
+  sum.appendChild(franja);
+
+  det.appendChild(sum);
+
+  const cuerpo = document.createElement("div");
+  cuerpo.className = "dia__cuerpo";
+  delDia.forEach((cita) => cuerpo.appendChild(renderCita(cita)));
+  det.appendChild(cuerpo);
+
+  return det;
 }
 
 function renderCita(cita) {
@@ -351,8 +470,10 @@ function leerHora(cual) {
   return h24 * 60 + min;
 }
 
+// El selector ya viene cargado solo con las sedes del usuario, así que alcanza
+// con leerlo: aunque esté oculto por tener una sola opción, esa opción es la buena.
 function sedeDelAlta() {
-  return sedeFija() ?? document.getElementById("nuevo-horario-sede").value;
+  return document.getElementById("nuevo-horario-sede").value;
 }
 
 // El calendario del panel NO se tiñe con el color de la sede: es una pantalla
@@ -574,6 +695,14 @@ export async function cargarHorarios() {
   const listEl = document.getElementById("horarios-list");
   listEl.innerHTML = '<p class="loading">Cargando horarios...</p>';
 
+  // Sin ninguna sede asignada no hay nada que pedir, y un `.in("sede_id", [])`
+  // se traduce a `in.()`, que PostgREST rechaza con un 400.
+  const mias = misSedesGestionadas();
+  if (Array.isArray(mias) && mias.length === 0) {
+    listEl.innerHTML = '<p class="empty-state">No tienes ninguna sede asignada.</p>';
+    return;
+  }
+
   const filtro = document.getElementById("filtro-sede-horarios").value;
 
   let query = supabase
@@ -585,10 +714,10 @@ export async function cargarHorarios() {
 
   if (filtro && filtro !== "todas") query = query.eq("sede_id", filtro);
 
-  // Solo se fuerza la sede si el trabajador tiene una. Si cubre todas, su
-  // sede_id es NULL y un .eq("sede_id", null) rompería la consulta.
-  const miSedeFija = sedeFija();
-  if (miSedeFija) query = query.eq("sede_id", miSedeFija);
+  // ⚠️ Este recorte NO es cosmético. `horarios_disponibles` se lee en abierto
+  // (el socio necesita ver los cupos), así que RLS no filtra nada aquí: si no se
+  // acota a sus sedes, el trabajador vería y podría intentar tocar los de todas.
+  if (mias) query = query.in("sede_id", mias);
 
   const { data: horarios, error } = await query;
 

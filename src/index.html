@@ -296,6 +296,10 @@
           <span id="panel-usuario"></span>
           <span id="panel-rol" class="badge"></span>
         </p>
+        <p id="panel-sin-sedes" class="panel-sin-sedes hidden">
+          Todavía no tienes ninguna sede asignada, por eso no ves citas ni horarios.
+          Pedíselo al administrador.
+        </p>
       </div>
       <button id="btn-logout" class="btn-pill btn-pill--salir">
         <svg class="btn-pill__ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 17l5-5-5-5M20 12H9M11 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5"/></svg>
@@ -389,33 +393,82 @@
 
     <!-- ---- Tab: Usuarios (solo admin) ---- -->
     <div id="tab-usuarios" class="tab-panel hidden" data-solo-admin>
-      <p class="tab-intro">Crea cuentas para tu equipo. Un trabajador solo ve las citas que le delegues y los horarios de su sede.</p>
-      <p class="tab-intro tab-intro--nota">La <strong>sede que gestiona</strong> define únicamente qué horarios puede crear y editar. Igual puede recibir citas de <strong>cualquier sede</strong>: las que le delegues las verá siempre, con el nombre de la sede a la vista.</p>
-      <form id="form-nuevo-usuario" class="inline-form">
-        <label>Nombre
-          <input name="nombre" required placeholder="Nombre del trabajador" />
-        </label>
-        <label>Email
-          <input type="email" name="email" required placeholder="correo@ejemplo.com" />
-        </label>
-        <label>Contraseña
-          <span class="pwd-field">
-            <input type="password" name="password" required minlength="8" placeholder="mín. 8 caracteres" />
-            <button type="button" class="pwd-toggle" data-pwd-toggle aria-label="Mostrar contraseña" aria-pressed="false">
-              <svg class="ico-ojo" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="2.8"/></svg>
-              <svg class="ico-ojo-off" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5c1.9 0 3.5.6 4.9 1.4M22 12s-3.6 6.5-10 6.5c-1.9 0-3.5-.6-4.9-1.4"/><path d="M4 4l16 16"/></svg>
-            </button>
-          </span>
-        </label>
-        <label>Sede que gestiona
-          <select name="sede" id="nuevo-usuario-sede" required></select>
-        </label>
-        <button type="submit" class="btn-primary">Crear trabajador</button>
-      </form>
-      <p id="usuario-error" class="error-text hidden"></p>
 
-      <div id="usuarios-list" class="usuarios-list">
-        <p class="loading">Cargando usuarios...</p>
+      <div id="usuarios-main">
+        <p class="tab-intro">Crea cuentas para tu equipo. Un trabajador ve las citas y gestiona los horarios de <strong>las sedes que le marques</strong>, y de ninguna otra.</p>
+        <p class="tab-intro tab-intro--nota">Marca varias si cubre más de una. Las sedes mandan también sobre sus <strong>correos de aviso</strong>: al cambiarlas se le reacomodan solos.</p>
+
+        <form id="form-nuevo-usuario" class="inline-form">
+          <label>Nombre
+            <input name="nombre" required placeholder="Nombre del trabajador" />
+          </label>
+          <label>Email
+            <input type="email" name="email" required placeholder="correo@ejemplo.com" />
+          </label>
+          <label>Contraseña
+            <span class="pwd-field">
+              <input type="password" name="password" required minlength="8" placeholder="mín. 8 caracteres" />
+              <button type="button" class="pwd-toggle" data-pwd-toggle aria-label="Mostrar contraseña" aria-pressed="false">
+                <svg class="ico-ojo" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="2.8"/></svg>
+                <svg class="ico-ojo-off" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5c1.9 0 3.5.6 4.9 1.4M22 12s-3.6 6.5-10 6.5c-1.9 0-3.5-.6-4.9-1.4"/><path d="M4 4l16 16"/></svg>
+              </button>
+            </span>
+          </label>
+          <fieldset class="sedes-check">
+            <legend>Sedes que gestiona</legend>
+            <div id="nuevo-usuario-sedes" class="sedes-check__lista"></div>
+          </fieldset>
+          <button type="submit" class="btn-primary">Crear trabajador</button>
+        </form>
+        <p id="usuario-error" class="error-text hidden"></p>
+
+        <div id="usuarios-list" class="usuarios-list">
+          <p class="loading">Cargando usuarios...</p>
+        </div>
+      </div>
+
+      <!-- Vista de editar: reemplaza a la lista, no se abre encima -->
+      <div id="usuario-editor" class="hidden">
+        <button type="button" class="btn-back" id="btn-editor-volver">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+          <span>Volver</span>
+        </button>
+
+        <div class="editor-card">
+          <p class="editor-card__kicker">Editar trabajador</p>
+          <h3 class="editor-card__nombre" id="editor-nombre"></h3>
+          <p class="editor-card__email" id="editor-email"></p>
+
+          <fieldset class="sedes-check">
+            <legend>Sedes que gestiona</legend>
+            <div id="editor-sedes" class="sedes-check__lista"></div>
+            <p id="editor-sedes-aviso" class="sedes-check__aviso hidden">
+              Sin ninguna sede marcada no verá citas ni horarios.
+            </p>
+          </fieldset>
+
+          <fieldset class="sedes-check">
+            <legend>Estado</legend>
+            <div class="sedes-check__lista">
+              <label class="check-row">
+                <input type="radio" name="editor-estado" value="activo" />
+                <span>Activo</span>
+              </label>
+              <label class="check-row">
+                <input type="radio" name="editor-estado" value="inactivo" />
+                <span>Inactivo</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <p class="usuario-avisos" id="editor-avisos"></p>
+
+          <div class="editor-card__acciones">
+            <button type="button" id="btn-editor-guardar" class="btn-primary">Guardar cambios</button>
+            <button type="button" id="btn-editor-cancelar" class="btn-small secondary">Cancelar</button>
+          </div>
+          <p id="editor-error" class="error-text hidden"></p>
+        </div>
       </div>
     </div>
 

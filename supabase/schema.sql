@@ -49,13 +49,33 @@ create table perfiles (
   nombre     text,
   rol        text not null default 'trabajador'
              check (rol in ('admin','trabajador')),
-  sede_id    text references sedes(id),   -- NULL = todas las sedes
+  -- ⚠️ EN DESUSO desde el 25/09/2026: la reemplazó `perfil_sedes`, porque una
+  -- sola columna no puede decir "dos de tres sedes". Ni el frontend ni las
+  -- políticas RLS la leen; se conserva solo para poder revertir.
+  sede_id    text references sedes(id),
   activo     boolean not null default true,
   created_at timestamptz not null default now()
 );
 
 create index idx_perfiles_rol  on perfiles (rol);
 create index idx_perfiles_sede on perfiles (sede_id);
+
+
+-- ---- Qué sedes gestiona cada trabajador ----
+-- Una fila por sede. Es un conjunto EXPLÍCITO: no existe un "todas" que se
+-- estire solo. Si BioFit abre una sede nueva, nadie la gestiona hasta que el
+-- admin la marque, y eso es a propósito: nadie debe ganar acceso a las citas de
+-- un local sin que alguien lo decida.
+--
+-- El admin NO aparece acá: sus permisos salen de `es_admin()`, no de esta tabla.
+create table perfil_sedes (
+  perfil_id  uuid not null references perfiles(id) on delete cascade,
+  sede_id    text not null references sedes(id)    on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (perfil_id, sede_id)
+);
+
+create index idx_perfil_sedes_perfil on perfil_sedes (perfil_id);
 
 
 -- ---- Horarios que el equipo habilita ----
@@ -139,14 +159,26 @@ language sql stable security definer set search_path = public, pg_temp as $$
                  where id = auth.uid() and rol = 'trabajador' and activo = true);
 $$;
 
+-- Las sedes del usuario actual, una por fila. Reemplazó a mi_sede() el
+-- 25/09/2026; se usa como `sede_id in (select mis_sedes())`.
+create or replace function mis_sedes() returns setof text
+language sql stable security definer set search_path = public, pg_temp as $$
+  select ps.sede_id
+    from perfil_sedes ps
+    join perfiles p on p.id = ps.perfil_id
+   where ps.perfil_id = auth.uid() and p.activo;
+$$;
+
+-- ⚠️ `mi_sede()` sigue existiendo pero YA NO LA USA NADIE: lee
+-- `perfiles.sede_id`, que quedó en desuso. No volver a apoyarse en ella.
 create or replace function mi_sede() returns text
 language sql stable security definer set search_path = public, pg_temp as $$
   select sede_id from perfiles where id = auth.uid() and activo = true;
 $$;
 
-revoke all on function mi_rol(), es_admin(), es_trabajador(), mi_sede()
+revoke all on function mi_rol(), es_admin(), es_trabajador(), mi_sede(), mis_sedes()
   from anon, public;
-grant execute on function mi_rol(), es_admin(), es_trabajador(), mi_sede()
+grant execute on function mi_rol(), es_admin(), es_trabajador(), mi_sede(), mis_sedes()
   to authenticated;
 
 
@@ -261,6 +293,7 @@ alter table sedes                enable row level security;
 alter table perfiles             enable row level security;
 alter table horarios_disponibles enable row level security;
 alter table citas                enable row level security;
+alter table perfil_sedes         enable row level security;
 alter table notificaciones_sede  enable row level security;
 
 
@@ -289,19 +322,36 @@ create policy "perfiles: solo admin elimina"
 --    bug ni se arregla tocando RLS — hay que manejar el NULL en pantalla.
 
 
+-- ---- PERFIL_SEDES ----
+-- El trabajador necesita LEER las suyas: con eso se configura su panel (qué
+-- sedes le salen en los selectores). Repartirlas es solo del admin.
+-- No hay UPDATE a propósito: una fila se crea o se borra, nunca se edita.
+create policy "perfil_sedes: ve las suyas, admin ve todas"
+  on perfil_sedes for select to authenticated
+  using (perfil_id = auth.uid() or es_admin());
+create policy "perfil_sedes: solo admin asigna"
+  on perfil_sedes for insert to authenticated with check (es_admin());
+create policy "perfil_sedes: solo admin quita"
+  on perfil_sedes for delete to authenticated using (es_admin());
+
+
 -- ---- HORARIOS DISPONIBLES ---- (el socio necesita ver los libres)
 create policy "horarios: lectura publica"
   on horarios_disponibles for select using (true);
-create policy "horarios: admin todas, trabajador su sede o ambas"
+create policy "horarios: admin todas, trabajador los de sus sedes (crear)"
   on horarios_disponibles for insert to authenticated
   with check (es_admin() or (es_trabajador()
-              and (mi_sede() is null or sede_id = mi_sede())));
-create policy "horarios: update admin todas, trabajador su sede o ambas"
+              and sede_id in (select mis_sedes())));
+create policy "horarios: admin todas, trabajador los de sus sedes (editar)"
   on horarios_disponibles for update to authenticated
   using      (es_admin() or (es_trabajador()
-              and (mi_sede() is null or sede_id = mi_sede())))
+              and sede_id in (select mis_sedes())))
   with check (es_admin() or (es_trabajador()
-              and (mi_sede() is null or sede_id = mi_sede())));
+              and sede_id in (select mis_sedes())));
+
+-- ⚠️ OJO: el SELECT de esta tabla es PÚBLICO (el socio tiene que ver los cupos),
+--    así que RLS no acota la LECTURA del trabajador. Recortarla a sus sedes es
+--    trabajo del frontend, y no es cosmético: ver `cargarHorarios()` en panel.js.
 create policy "horarios: solo admin elimina"
   on horarios_disponibles for delete to authenticated using (es_admin());
 
@@ -316,21 +366,22 @@ create policy "horarios: solo admin elimina"
 --    aleatorio (ver TAREAS.md punto 15), nunca por una política abierta.
 create policy "citas: reserva publica"
   on citas for insert to anon, authenticated with check (true);
-create policy "citas: admin todas, trabajador su sede o ambas (ver)"
+create policy "citas: admin todas, trabajador las de sus sedes (ver)"
   on citas for select to authenticated
   using (es_admin() or (es_trabajador()
-         and (mi_sede() is null or sede_id = mi_sede())));
-create policy "citas: admin todas, trabajador su sede o ambas (editar)"
+         and sede_id in (select mis_sedes())));
+create policy "citas: admin todas, trabajador las de sus sedes (editar)"
   on citas for update to authenticated
   using      (es_admin() or (es_trabajador()
-              and (mi_sede() is null or sede_id = mi_sede())))
+              and sede_id in (select mis_sedes())))
   with check (es_admin() or (es_trabajador()
-              and (mi_sede() is null or sede_id = mi_sede())));
+              and sede_id in (select mis_sedes())));
 create policy "citas: solo admin elimina"
   on citas for delete to authenticated using (es_admin());
 
--- La sede del trabajador manda: ve las citas de su sede, o todas si su
--- `sede_id` es NULL ("ambas sedes"). Misma forma que `horarios_disponibles`.
+-- Las sedes del trabajador mandan: ve las citas de las sedes que gestiona, y de
+-- ninguna otra. Misma forma que `horarios_disponibles`, pero aquí RLS sí acota
+-- la lectura, porque `citas` no es de lectura pública.
 -- ⚠️ `citas.asignado_a` ya NO participa: la delegación cita por cita se eliminó
 --    el 25/09/2026 y la columna queda solo como historial.
 

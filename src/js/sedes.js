@@ -69,9 +69,10 @@ export function mapsUrlSede(sedeId) {
 // `incluirTodasLasSedes` agrega "Todas las sedes" al inicio: sirve para ELEGIR
 //   al crear algo (un correo que recibe los avisos de todas, un trabajador que
 //   las cubre todas). Son cosas distintas, por eso son dos opciones y no una.
+// `soloSedes` recorta la lista a ese conjunto de ids. null = todas.
 export function llenarSelectSedes(
   select,
-  { incluirTodas = false, incluirTodasLasSedes = false, soloSede = null } = {}
+  { incluirTodas = false, incluirTodasLasSedes = false, soloSedes = null } = {}
 ) {
   if (!select) return;
   select.innerHTML = "";
@@ -91,7 +92,7 @@ export function llenarSelectSedes(
   }
 
   _sedes
-    .filter((s) => !soloSede || s.id === soloSede)
+    .filter((s) => !soloSedes || soloSedes.includes(s.id))
     .forEach((sede) => {
       const opt = document.createElement("option");
       opt.value = sede.id;

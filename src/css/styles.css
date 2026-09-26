@@ -356,7 +356,20 @@ body {
   grid-template-columns: repeat(var(--cols, 7), minmax(0, 1fr));
   gap: 8px;
 }
-.gcal__daycol { display: flex; flex-direction: column; gap: 8px; }
+.gcal__daycol {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 6px 4px 8px;
+  border-radius: 12px;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+/* El día elegido en el mini calendario se resalta en toda su columna. El tinte
+   sale del color de la sede, muy diluido, para que las píldoras sigan legibles. */
+.gcal__daycol.is-selected {
+  background: var(--sede-suave, var(--color-primary-light));
+  box-shadow: inset 0 0 0 1px var(--sede-borde, var(--color-border));
+}
 .gcal__dayhd { text-align: center; margin-bottom: 2px; }
 .gcal__dayhd .dow {
   display: block;
@@ -1326,32 +1339,164 @@ body {
 }
 
 /* ============================================
-   USUARIOS — la sede manda sobre los correos de aviso
+   SUB-PESTAÑAS — Citas: próximas / historial
+   Las dos listas están en el DOM; esto elige cuál se ve. Con las dos apiladas
+   había que recorrer todas las próximas para llegar al historial.
    ============================================ */
 
-.usuario-sede {
+.subtabs {
   display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 0 0 14px;
+  padding: 4px;
+  background: var(--color-neutral-light);
+  border-radius: 999px;
+  width: fit-content;
+  max-width: 100%;
+}
+.subtab {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-  font-size: 0.78rem;
+  gap: 7px;
+  border: none;
+  background: none;
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.subtab:hover { color: var(--color-text); }
+.subtab.active {
+  background: var(--color-surface);
+  color: var(--color-primary-dark);
+  box-shadow: var(--shadow);
+}
+.subtab__cuenta {
+  font-size: 0.75rem;
   font-weight: 700;
+  min-width: 20px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--color-surface);
   color: var(--color-text-muted);
 }
-.select-sede-usuario {
-  padding: 6px 10px;
-  border-radius: 8px;
+.subtab.active .subtab__cuenta {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+@media (max-width: 520px) {
+  .subtabs { width: 100%; }
+  .subtab { flex: 1; justify-content: center; padding: 9px 10px; font-size: 0.82rem; }
+}
+
+/* ============================================
+   USUARIOS — las sedes mandan sobre los correos de aviso
+   ============================================ */
+
+/* Grupo de checks, usado por el alta y por la vista de editar. */
+.sedes-check {
   border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  font-family: inherit;
-  font-size: 0.85rem;
+  border-radius: 12px;
+  padding: 12px 14px 14px;
+  margin: 0 0 16px;
+  min-width: 0;
+}
+.sedes-check legend {
+  padding: 0 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--color-text-muted);
+}
+.sedes-check__lista { display: flex; flex-direction: column; gap: 8px; }
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 9px;
+  font-size: 0.9rem;
   font-weight: 600;
   color: var(--color-text);
+  cursor: pointer;
+  transition: background 0.12s ease;
 }
-.select-sede-usuario:focus { outline: 2px solid var(--color-primary); border-color: transparent; }
-.select-sede-usuario:disabled { opacity: 0.5; cursor: wait; }
+.check-row:hover { background: var(--color-neutral-light); }
+.check-row input {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--color-primary);
+  flex-shrink: 0;
+  cursor: pointer;
+}
 
-.usuario-avisos { font-size: 0.8rem; color: var(--color-text-muted); margin-top: 4px; }
+.sedes-check__aviso {
+  margin: 10px 0 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #7a5b00;
+  background: #fff8e6;
+  border: 1px solid #f5d98a;
+  border-radius: 9px;
+  padding: 8px 12px;
+}
+
+/* El alta es un formulario en fila. El grupo de checks se lleva una fila entera
+   para sí mismo, y sus sedes van en horizontal mientras quepan.
+   ⚠️ `.check-row` es un <label>, así que `.inline-form label` (más específico) le
+   gana y le pone el check ENCIMA del texto. Hay que devolverlo a fila. */
+.inline-form .sedes-check { flex: 0 0 100%; margin: 2px 0 0; }
+.inline-form .sedes-check__lista { flex-direction: row; flex-wrap: wrap; gap: 4px 12px; }
+.inline-form .check-row { flex-direction: row; align-items: center; width: auto; }
+
+.usuario-avisos {
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+  margin: 4px 0 18px;
+}
+
+/* ---- Vista de editar un trabajador ---- */
+.editor-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 22px 20px;
+  max-width: 520px;
+}
+.editor-card__kicker {
+  margin: 0 0 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--color-text-muted);
+}
+.editor-card__nombre { margin: 0 0 2px; font-size: 1.2rem; }
+.editor-card__email { margin: 0 0 18px; font-size: 0.88rem; color: var(--color-text-muted); }
+.editor-card__acciones { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+/* Un trabajador sin sedes ve el panel vacío; sin esto parece que se rompió. */
+.panel-sin-sedes {
+  margin: 10px 0 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #fff8e6;
+  border: 1px solid #f5d98a;
+  color: #7a5b00;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  max-width: 560px;
+}
 
 /* Correo que no se administra a mano, sino desde la ficha del trabajador. */
 .chip-origen {

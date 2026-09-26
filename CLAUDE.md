@@ -58,7 +58,7 @@ con un límite de ~500 correos/día (de sobra para este volumen).
 | Actor | ¿Inicia sesión? | Qué puede hacer |
 |---|---|---|
 | **Cliente / socio** | **No.** Acceso anónimo | Solo reservar una cita desde la web pública. No tiene registro, ni credenciales, ni panel. No construir login para él. |
-| **Trabajador** | Sí | Ve y edita **las citas de su sede** (o de todas si su `sede_id` es NULL). Gestiona horarios **solo de su sede**. Recibe por correo los avisos de su sede. |
+| **Trabajador** | Sí | Ve y edita **las citas de las sedes que gestiona** (las de `perfil_sedes`). Gestiona horarios **solo de esas sedes**. Recibe por correo los avisos de esas sedes. |
 | **Administrador** (Luis) | Sí | Control total: citas, horarios, usuarios, configuración de correos, y delegar citas a trabajadores. |
 
 ---
@@ -132,8 +132,24 @@ hay que quitar antes el trigger `trg_notificar_cita_delegada`.
 
 ### `perfiles`
 `id` uuid PK → `auth.users` · `email` · `nombre` ·
-`rol` (`admin` \| `trabajador`) · `sede_id` → sedes (nullable) ·
-`activo` bool · `created_at`
+`rol` (`admin` \| `trabajador`) · `activo` bool · `created_at` ·
+`sede_id` → sedes (nullable) — **en desuso** desde el 25/09/2026, la reemplazó
+`perfil_sedes`. Se deja solo para poder revertir; nadie la lee.
+
+### `perfil_sedes`
+`perfil_id` uuid → perfiles · `sede_id` text → sedes · `created_at`
+PK compuesta `(perfil_id, sede_id)`
+
+Qué sedes gestiona cada trabajador: **una fila por sede**. Es un conjunto
+**explícito** — no existe un "todas" que se estire solo. Si BioFit abre una sede
+nueva, nadie la gestiona hasta que el admin la marque, y eso es a propósito:
+nadie debe ganar acceso a las citas de un local sin que alguien lo decida.
+
+Nació porque con 3 sedes una sola columna no puede decir "Magdalena y Jesús
+María pero no Lince". El admin las reparte con checks desde la vista **Editar
+trabajador** de la pestaña Usuarios.
+
+El admin **no** tiene filas acá: sus permisos salen de `es_admin()`.
 
 ### `notificaciones_sede`
 `id` uuid PK · `sede_id` → sedes · `email` · `activo` bool · `created_at`
@@ -143,7 +159,7 @@ Correos que reciben el aviso interno cuando entra una cita. Varios por sede,
 editables desde el panel por el admin.
 
 ⚠️ **Los correos de los trabajadores los administra la pestaña Usuarios, no la
-de Correos.** Al crear un trabajador se le da de alta en su sede (o en todas);
+de Correos.** Al crear un trabajador se le da de alta en las sedes que marcaste;
 al cambiarle la sede o desactivarlo, sus filas se reacomodan solas. Tocarlos a
 mano desde la pestaña Correos funciona, pero el próximo cambio de sede los
 vuelve a dejar como manda la ficha del usuario. Por eso esas filas salen
@@ -155,8 +171,11 @@ marcadas con "Se gestiona en Usuarios".
 mi_rol()        -> 'admin' | 'trabajador'
 es_admin()      -> boolean
 es_trabajador() -> boolean
-mi_sede()       -> sede_id asignada al usuario actual
+mis_sedes()     -> setof text, las sedes del usuario actual
+mi_sede()       -> EN DESUSO. Lee perfiles.sede_id. No apoyarse en ella.
 ```
+
+En las políticas se usa como `sede_id in (select mis_sedes())`.
 
 Son `STABLE SECURITY DEFINER` con `search_path` fijado, filtran por `activo = true`,
 y solo las puede ejecutar el rol `authenticated`. Se usan dentro de las políticas
@@ -173,9 +192,10 @@ RLS, por eso deben conservar su `GRANT EXECUTE` a `authenticated`.
 | Tabla | Público (anon) | Trabajador | Admin |
 |---|---|---|---|
 | `sedes` | leer | leer | leer + editar |
-| `horarios_disponibles` | leer | leer; crear/editar **solo su sede**; **no puede borrar** | todo |
-| `citas` | **solo insertar** (no puede leer ninguna) | ver/editar **las de su sede** (todas si `sede_id` es NULL); **no puede borrar** | todo |
+| `horarios_disponibles` | leer | leer; crear/editar **solo sus sedes**; **no puede borrar** | todo |
+| `citas` | **solo insertar** (no puede leer ninguna) | ver/editar **las de sus sedes**; **no puede borrar** | todo |
 | `perfiles` | sin acceso | solo su propio perfil | todo |
+| `perfil_sedes` | sin acceso | leer **solo las suyas** | todo |
 | `notificaciones_sede` | sin acceso | sin acceso | todo |
 
 La base rechaza cualquier cosa fuera de esto. Diseñar la UI para que coincida:
