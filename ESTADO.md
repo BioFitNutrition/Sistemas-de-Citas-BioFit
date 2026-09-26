@@ -19,9 +19,10 @@
 
 ## 🚨 Lo primero
 
-**1. La portada sigue pequeña: 626×352.** Es más grande que la anterior, pero en
-un monitor todavía hay que estirarla 3 veces. Si tienes el original, mándalo:
-mismo nombre de archivo, no hay que tocar código. Detalle en el punto 6.
+**1. La portada se veía difuminada y ya está corregido.** La culpa era un
+desenfoque que se le había puesto al fondo; se quitó y la imagen se subió
+reescalada a 1600×900. **Si tienes el original en grande, mándalo igual**: el que
+hay salió de uno de 626×352, así que tiene el detalle que tiene.
 
 **2. Haz una reserva de prueba con tu correo.** Comprueba de un tiro que el
 correo llega **bien formado** (hoy llegaba como texto crudo) y que el botón
@@ -220,15 +221,26 @@ se estiraba) y **no salta al hacer scroll**. Es `fixed` en el elemento, no
 - **En pantallas angostas la foto se ancla a la izquierda.** Los objetos están
   arriba a la izquierda y el resto es mantel vacío: centrada, un celular
   recortaba los lados y dejaba justo el vacío.
-- **En pantallas de 900px o más lleva un desenfoque de 2px.** La foto mide
-  626×352 y hay que estirarla 3 veces; el desenfoque la convierte en textura, y
-  se lee como decisión de diseño en vez de como una imagen reventada.
+- **Sin desenfoque.** Se probó ponerle 2px en pantallas grandes para disimular
+  que la foto venía a 626×352, y se veía sucio: era lo primero que saltaba a la
+  vista. **No volver a hacerlo.**
 
-### 🚨 Sigue estando pequeña: 626×352
+### La nitidez: reescalada, no desenfocada
 
-Es más grande que la anterior (462×260) pero sigue lejos de lo que pide un
-monitor. **Si tienes el original en grande, mándalo:** mismo nombre de archivo,
-no hay que tocar código, y ahí se borra el bloque del desenfoque.
+El archivo que mandaste mide **626×352**, y en un monitor había que estirarlo casi
+3 veces. El primer intento fue taparlo con un desenfoque, y **se veía peor**: lo
+que se notaba era el desenfoque.
+
+Lo que se hizo en su lugar: subir la imagen ya reescalada a **1600×900 con LANCZOS
+y una máscara de enfoque**, así el navegador ya no tiene que estirar casi nada
+(1,2× en una pantalla de 1920) y no hay que tapar nada. Cuesta **106 KB** y deja
+la página en **980 KB**.
+
+⚠️ **Se reescala SIEMPRE desde el archivo original de Christopher**, nunca desde el
+que ya está en `src/assets/`: reescalar sobre un reescalado acumula pérdida.
+
+**Si tienes el original en grande, mándalo igual:** ampliar no inventa detalle, y
+con la foto nativa esto se vuelve innecesario.
 
 ## 7. Cómo se verificó
 
@@ -347,6 +359,9 @@ navegador** (cancelación, tarjeta de Lince, portada de un solo botón).
     texto. Añadir contenido al flujo de una tarjeta las vuelve a desparejar.
 21d. **Los tamaños van con `clamp()`, no con saltos de breakpoint**, para que la
     página se acomode de forma continua al ancho.
+21e. **⚠️ Nada de `filter: blur()` en el fondo.** Ya se probó y se ve sucio. Una
+    foto de poca resolución se arregla subiéndola reescalada (LANCZOS + máscara
+    de enfoque), no desenfocándola.
 22. **El alta de horarios en lote usa `ignoreDuplicates: true`.**
 23. **Un horario con cualquier cita apuntándolo no se puede borrar**, aunque esté
     cancelada.

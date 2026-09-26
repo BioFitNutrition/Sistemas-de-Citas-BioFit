@@ -64,17 +64,12 @@ body::before {
   body::before { background-position: left center, left center; }
 }
 
-/* La foto original mide 626x352. En el celular se ve nítida, pero en un monitor
-   hay que estirarla 3 veces y se pixela. Un desenfoque mínimo la convierte en
-   una textura: se lee como decisión de diseño y no como una imagen reventada.
-   Si algún día llega la foto en grande, se borra este bloque entero.
-   El scale tapa el borde translúcido que deja el blur. */
-@media (min-width: 900px) {
-  body::before {
-    filter: blur(2px);
-    transform: scale(1.05);
-  }
-}
+/* ⚠️ NO volver a ponerle `filter: blur()` al fondo. Se probó (2px en pantallas
+   grandes, para disimular que la foto venía a 626x352) y se veía sucio: lo
+   primero que se notaba al abrir la página era el desenfoque.
+   El camino correcto es el otro: la imagen se sube reescalada a 1600x900 con
+   LANCZOS y una máscara de enfoque, así el navegador ya no tiene que estirarla
+   y no hace falta tapar nada. */
 
 .hidden { display: none !important; }
 
