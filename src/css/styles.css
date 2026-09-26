@@ -52,16 +52,19 @@ body::before {
   position: fixed;
   inset: 0;
   z-index: -1;
-  background:
+  background-color: var(--color-bg);
+  background-image:
     linear-gradient(rgba(247, 248, 247, 0.60), rgba(247, 248, 247, 0.60)),
-    url("assets/portada-biofit.jpg") center / cover no-repeat;
-}
-
-/* La foto tiene los objetos (manzana, pesas, cinta) arriba a la IZQUIERDA y el
-   resto es mantel vacío. En una pantalla angosta, `cover` centrado recorta los
-   lados y deja justo el vacío: se anclan a la izquierda para que se vean. */
-@media (max-width: 700px) {
-  body::before { background-position: left center, left center; }
+    url("assets/portada-biofit.jpg");
+  background-position: center, center;
+  background-repeat: no-repeat, no-repeat;
+  /* ⚠️ `contain`, NO `cover`. La foto es del consultorio entero y se quiere ver
+     entero: `cover` recorta para llenar, y en un celular vertical (ratio 0.46
+     contra el 1.50 de la foto) se comía casi todo el ambiente, dejando solo una
+     franja del escritorio. Con `contain` la foto entra completa en cualquier
+     pantalla; lo que sobra a los lados o arriba lo cubre --color-bg, que es el
+     mismo tono del velo y no se nota como borde. */
+  background-size: auto, contain;
 }
 
 /* ⚠️ NO volver a ponerle `filter: blur()` al fondo. Se probó (2px en pantallas

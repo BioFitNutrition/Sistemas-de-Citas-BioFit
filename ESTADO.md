@@ -19,10 +19,10 @@
 
 ## 🚨 Lo primero
 
-**1. La portada se veía difuminada y ya está corregido.** La culpa era un
-desenfoque que se le había puesto al fondo; se quitó y la imagen se subió
-reescalada a 1600×900. **Si tienes el original en grande, mándalo igual**: el que
-hay salió de uno de 626×352, así que tiene el detalle que tiene.
+**1. La portada ahora es el consultorio, y se ve ENTERO.** Para eso el fondo pasó
+de `cover` a `contain`: `cover` recortaba, y en un celular vertical se comía casi
+todo el ambiente. **Si tienes la foto en grande, mándala igual**: la que hay salió
+de una de 736×490.
 
 **2. Haz una reserva de prueba con tu correo.** Comprueba de un tiro que el
 correo llega **bien formado** (hoy llegaba como texto crudo) y que el botón
@@ -225,16 +225,30 @@ se estiraba) y **no salta al hacer scroll**. Es `fixed` en el elemento, no
   que la foto venía a 626×352, y se veía sucio: era lo primero que saltaba a la
   vista. **No volver a hacerlo.**
 
+### Se ve el consultorio COMPLETO: `contain`, no `cover`
+
+⚠️ **El fondo usa `background-size: contain`. No cambiarlo a `cover`.** `cover`
+llena la pantalla recortando lo que sobra: en un celular vertical (ratio 0,46
+contra el 1,50 de la foto) dejaba solo una franja del escritorio y el resto del
+consultorio desaparecía. Con `contain` la foto entra completa en cualquier
+pantalla, y lo que sobra a los lados o arriba lo cubre `--color-bg`, que es el
+mismo tono del velo y no se nota como borde.
+
+La foto es bastante oscura (brillo medio **23/100**), así que el velo 0,60 le
+viene bien: el texto sobre el fondo queda en **10,1:1** de media y **5,8:1** en el
+peor caso, holgado.
+
 ### La nitidez: reescalada, no desenfocada
 
-El archivo que mandaste mide **626×352**, y en un monitor había que estirarlo casi
-3 veces. El primer intento fue taparlo con un desenfoque, y **se veía peor**: lo
-que se notaba era el desenfoque.
+Los archivos que has mandado vienen pequeños (el del consultorio, **736×490**). El
+primer intento fue tapar eso con un desenfoque, y **se veía peor**: lo que se
+notaba era el desenfoque.
 
-Lo que se hizo en su lugar: subir la imagen ya reescalada a **1600×900 con LANCZOS
-y una máscara de enfoque**, así el navegador ya no tiene que estirar casi nada
-(1,2× en una pantalla de 1920) y no hay que tapar nada. Cuesta **106 KB** y deja
-la página en **980 KB**.
+Lo que se hizo en su lugar: subir la imagen ya reescalada con **LANCZOS y una
+máscara de enfoque**, así el navegador no tiene que estirar casi nada y no hay que
+tapar nada. La del consultorio va a **1600×1065** (con `contain`, una pantalla de
+1080 de alto pide unos 1620 de ancho, así que no la estira). Cuesta **133 KB** y
+deja la página en **1016 KB**.
 
 ⚠️ **Se reescala SIEMPRE desde el archivo original de Christopher**, nunca desde el
 que ya está en `src/assets/`: reescalar sobre un reescalado acumula pérdida.
