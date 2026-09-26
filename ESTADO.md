@@ -15,240 +15,284 @@
 |---|---|
 | **Fecha** | 25/09/2026 |
 | **Última escritura** | Claude Code |
-| **Siguiente** | Christopher — **cargar horarios de Lince** y probar el panel con las cuentas reales |
+| **Siguiente** | Christopher — **responder la pregunta del punto 6** (plazo para cancelar) y **cargar los horarios de Lince** |
 
 ## 🚨 Lo primero
 
 **1. Lince sigue sin horarios.** La sede existe y aparece en la web, pero sin
-horarios nadie puede reservar ahí. Hay que entrar como admin y cargarlos.
+horarios nadie puede reservar ahí. Entra como admin y cárgalos.
 
-**2. Revisa el reparto de sedes de cada trabajador.** La migración de hoy
-convirtió lo que había, pero conviene mirarlo: entra a Usuarios → Editar y
-confirma que cada uno tiene marcadas las que le tocan.
+**2. Falta una decisión tuya** para poder hacer la cancelación por parte del
+socio: **hasta cuándo se puede cancelar**. Está en el punto 6.
 
-Lo demás está aplicado, construido, subido y verificado.
+**3. Revisa el reparto de sedes** de cada trabajador en Usuarios → Editar.
+
+Todo lo demás está aplicado, construido, subido y verificado.
 
 ---
 
-## 2. Cambios en la base
+## 2. Cambios en la base (hoy fueron SEIS)
 
-Hoy se corrieron **cuatro** cosas. Las dos primeras venían de la tanda anterior.
+| # | Migración | Qué hizo |
+|---|---|---|
+| a | `citas_visibles_por_sede` | Las citas del trabajador salen de su sede, no de `asignado_a`. **Superada por (d)** esa misma tarde |
+| b | Sede **Lince** | Fila nueva en `sedes`, color `#147362` (teal del logo) |
+| c | Nombre del admin | `perfiles.nombre` decía "Villayzán"; es **"Villayzan"**, sin tilde |
+| d | ⭐ `perfil_sedes_seleccion_multiple` | El trabajador pasa a gestionar **un conjunto** de sedes |
+| e | `citas_dni_cliente` | Columna `dni_cliente text`, **nullable** |
+| f | `realtime_sedes_horarios_perfil_sedes` | Realtime de verdad (ver abajo) |
 
-### a) `citas_visibles_por_sede` — las citas del trabajador salen de su sede
+Los archivos están en `supabase/migraciones/`, cada uno con su SQL de reversa.
 
-`supabase/migraciones/2026-09-25-citas-por-sede.sql`. Reemplazó el modelo viejo,
-que ataba las citas a `citas.asignado_a` (la delegación, ya eliminada).
-**Quedó superada esa misma tarde por el punto (d)**, pero se corrió y se verificó.
+### ⭐ Lo grande: `perfil_sedes` (punto 8 de `TAREAS.md`)
 
-### b) Tercera sede: Lince
+`perfiles.sede_id` era **una** columna: solo podía decir "esta sede" o NULL
+("todas"). Con 3 sedes, *"Magdalena y Jesús María pero no Lince"* no se puede ni
+escribir.
 
-`supabase/migraciones/2026-09-25-sede-lince.sql`.
-`lince` · Sede Lince · Av. Petit Thouars 1860, Lince · color `#147362`, el teal
-del logo.
+- Tabla nueva `perfil_sedes (perfil_id, sede_id)` — una fila por sede
+- Función nueva `mis_sedes()`, reemplaza a `mi_sede()`
+- **4 políticas reescritas**: `citas` ver/editar, `horarios` crear/editar, ahora
+  con `sede_id in (select mis_sedes())`
 
-⚠️ **Sus URLs de mapa no llevan lat/lng, llevan el nombre del local.** Del link
-de `maps.app.goo.gl` que pasaste no salen coordenadas, y un pin inventado manda
-al socio a la cuadra equivocada. Buscan `XFLY Lince, Av. Petit Thouars 1860` y
-Google lo resuelve — comprobado en producción: el mapa pinta con el rótulo
-"Xfly Funcional Training - Lince". Si consigues las coordenadas exactas, se
-cambian con un `UPDATE` y el frontend las toma solo.
+⚠️ **`perfiles.sede_id` queda EN DESUSO**, igual que `citas.asignado_a`. No se
+borró porque es lo único que permite revertir. `mi_sede()` sigue existiendo pero
+**ya no la usa nada**.
 
-### c) El nombre del admin
+⚠️ **El conjunto es EXPLÍCITO**, como decidiste: no hay un "todas" que se estire
+solo. Al abrir una sede nueva, **nadie la gestiona** hasta que la marques.
 
-`perfiles.nombre` decía "Luis Villayzán". Es **"Villayzan"**, sin tilde.
-Corregido también en `CLAUDE.md` y `README.md`.
+⚠️ **Al revertir hay un paso que no se puede saltar.** Los trabajadores nuevos
+tienen `sede_id` NULL, y en el modelo viejo NULL significa *todas las sedes*:
+revertir sin rearmar esa columna primero **les abre el acceso a todo**. El SQL
+está al final del archivo de migración.
 
-### d) ⭐ `perfil_sedes_seleccion_multiple` — el cambio grande de hoy
+### ⚡ Realtime: hasta hoy solo funcionaba a medias
 
-`supabase/migraciones/2026-09-25-perfil-sedes.sql`. Es el **punto 8 de
-`TAREAS.md`**, que abrir Lince volvió urgente.
+⚠️ **La publicación `supabase_realtime` solo tenía `citas`.** Suscribirse a otra
+tabla desde el frontend **no daba ningún error**: simplemente nunca llegaba nada.
+Se agregaron `sedes`, `horarios_disponibles` y `perfil_sedes`.
 
-**El problema:** `perfiles.sede_id` es UNA columna. Solo podía decir "esta sede"
-o NULL ("todas"). Con 2 sedes alcanzaba; con 3, *"Magdalena y Jesús María pero
-no Lince"* no se puede ni escribir.
+Con eso: una sede nueva aparece sola en el panel y en la web del socio, los
+horarios reflejan lo que haga otro usuario, y si le cambias las sedes a un
+trabajador que está con el panel abierto, su pantalla se reacomoda sin que
+vuelva a entrar. Al reconfigurar los selectores **se conserva el filtro** que
+tenía elegido.
+
+---
+
+## 3. Cómo va el uso del Gmail: sobra muchísimo
+
+Preguntaste si nos pasamos del plan gratis. **No, ni cerca.**
 
 | | |
 |---|---|
-| Tabla nueva | `perfil_sedes (perfil_id, sede_id)` — una fila por sede |
-| Función nueva | `mis_sedes()`, `setof text`, reemplaza a `mi_sede()` |
-| Políticas reescritas | **4**: `citas` ver/editar, `horarios` crear/editar |
-| Se migró | sede concreta → 1 fila · NULL ("todas") → una fila por sede |
+| Correos por cita hoy | **2** (1 aviso interno + 1 confirmación al socio) |
+| Día de más movimiento (16/09) | 7 citas → **~14 correos** |
+| Últimas 24 h | 1 cita, 2 correos, **ambos enviados sin error** |
+| Límite de Gmail | ~**500 destinatarios al día** |
 
-Las políticas ahora dicen `sede_id in (select mis_sedes())`.
+En tu día más cargado usaste cerca del **3 %** del límite. Los logs de la Edge
+Function no muestran ni un fallo de envío.
 
-⚠️ **`perfiles.sede_id` queda EN DESUSO**, igual que `citas.asignado_a`. No se
-borró porque es lo único que permite revertir. Nadie la lee: ni el frontend ni
-las políticas. `mi_sede()` sigue existiendo pero **ya no la usa nada**.
-
-⚠️ **El conjunto de sedes es EXPLÍCITO**, y lo decidiste tú: no queda ningún
-"todas" que se estire solo. Cuando abras una sede nueva, **nadie la gestiona**
-hasta que entres y la marques.
-
-⚠️ **Al revertir hay un paso que no se puede saltar.** Los trabajadores creados
-de ahora en adelante tienen `sede_id` NULL, y en el modelo viejo NULL significa
-*todas las sedes*: revertir sin rearmar esa columna primero **les abre el acceso
-a todo**. El SQL para rearmarla está al final del archivo de migración.
+Donde sí hay que mirar es cuando se hagan los **recordatorios automáticos**
+(punto 17): ahí cada cita pasa a costar ~8 correos, y el margen baja a unas 60
+citas diarias. Sigue siendo 30 veces tu volumen actual.
 
 ---
 
-## 3. Qué cambió en el frontend
+## 4. El "=20" del correo: arreglado
+
+El HTML de los correos iba **indentado**, así que varias líneas terminaban en
+espacios. Quoted-printable **obliga** a escribir un espacio final como `=20`, y a
+Gmail en el celular le llegaban sin decodificar: salía un `=20` suelto arriba y
+otro abajo del mensaje.
+
+Se arregla en el origen: `compactar()` deja el HTML en **una sola línea** antes de
+enviarlo. Medido: **2 líneas con espacio final antes, 0 después** — justo los dos
+`=20` que se veían.
+
+⚠️ **La función desplegada NO era igual a la del repo** (usaba otra librería SMTP
+y tenía más logs). Se tomó **la desplegada** como base para no perder nada, y el
+repo queda sincronizado con producción. Desplegada como **versión 4**, con
+`verify_jwt = false` intacto (la llama un Database Webhook, que no manda JWT).
+
+---
+
+## 5. Qué cambió en el frontend
 
 ### 🧑‍🔧 Vista de editar trabajador
 
-En la pestaña Usuarios, cada trabajador tiene un botón **Editar** que abre una
-pantalla propia (reemplaza a la lista, no se abre encima):
+Botón **Editar** en cada trabajador → pantalla propia con **checks de sedes**,
+**estado** (Activo/Inactivo) y **Guardar**. Un resumen en texto llano que se
+actualiza al vuelo, y un aviso si desmarca todas. La lista quedó compacta con los
+chips de sus sedes. El alta también pasó a checks y **exige al menos una sede**.
 
-- **Checks de sedes** — se marcan las que gestiona: una, varias o todas
-- **Estado** — Activo / Inactivo, que antes era un botón en la lista
-- **Guardar cambios** / **Volver**
-- Un resumen en texto llano que se actualiza al vuelo: *"Verá las citas y los
-  horarios de X y Y, y recibirá por correo los avisos de esas sedes"*
-- Si desmarca todas, avisa: *"Sin ninguna sede marcada no verá citas ni horarios"*
+### 🧭 El panel del trabajador se explica solo
 
-La lista quedó compacta: nombre, correo, chips de sus sedes con su color, estado
-y el botón Editar. El alta también pasó a checks y **exige al menos una sede**.
+Abre con **"Tus sedes asignadas son:"** y sus chips, más una guía desplegable de
+siete puntos: que solo ve lo de sus sedes, que puede deshabilitar pero **no**
+borrar, que "reservado" no es "inhabilitado", que cancelar libera el horario solo,
+que la lista se actualiza sola, y demás. Al admin no se le muestra.
 
-### 🗂️ Citas: sub-pestañas y agrupadas por día
+### 🐛 El combo de sede del trabajador no filtraba
 
-Las dos secciones ya existían, pero **apiladas**: para llegar al historial había
-que recorrer todas las próximas. Ahora son **sub-pestañas** con su contador
-—`Próximas 6` · `Pasadas o canceladas 5`— y solo se ve una. El cambio no vuelve a
-consultar la base: las dos listas ya están en pantalla, solo se oculta una.
+Estaba **fijado en "todas"** en el código para el trabajador, herencia de cuando
+sus citas podían ser de cualquier sede. Con el selector ya visible para quien
+tiene varias sedes, el resultado era un combo decorativo: lo viste elegir "Jesús
+María" y seguir mostrando citas de Magdalena. **Arreglado.**
 
-Dentro de cada una, las citas van **agrupadas por día y desplegables**, igual que
-los horarios. Cerrado, un día ocupa una fila y ya dice lo esencial: qué día es,
-cuántas citas hay, y la franja de horas o cuántas están canceladas.
+### 🗂️ Sub-pestañas en Citas y en Horarios
 
-- **Próximas**: días de más cercano a más lejano, el primero abierto
-- **Historial**: días de más reciente a más viejo, **todos cerrados** (es para
-  consultar, no para atender)
-- Se recuerda qué días dejaste abiertos, para que un recargado por realtime no
-  te los cierre en la cara
+- **Citas**: `Próximas` · `Pasadas o canceladas`, con su contador
+- **Horarios**: `Libres` · `Reservados` · `Inhabilitados` — antes reservado e
+  inhabilitado iban juntos y son cosas distintas: uno lo tomó un socio, al otro
+  lo apagaste tú
+
+Solo se ve una a la vez, y dentro van **agrupadas por día y desplegables**.
+Cambiar de sub-pestaña no vuelve a consultar la base.
+
+⚠️ **Esto casi causó un accidente:** con secciones ocultas, "seleccionar todos
+los visibles" marcaba también los de las otras sub-pestañas, y una pulsada a
+Eliminar habría borrado horarios que nunca viste. El selector quedó acotado a la
+sección abierta, y cambiar de sub-pestaña **limpia la selección**.
+
+### 🪪 DNI del socio
+
+Campo obligatorio de **8 dígitos** en el formulario, validado con mensaje claro.
+Sale en la tarjeta del panel y en el correo de aviso interno. La columna es
+nullable: las 31 citas anteriores no tienen DNI, así que la tarjeta no pinta la
+línea cuando no hay.
+
+### 🎛️ Todos los combo box iguales
+
+Un solo estilo para los `<select>` del sistema, con `appearance:none` y flecha
+propia. El nativo se dibuja distinto en cada navegador y en Windows quedaba gris
+y cuadrado al lado del resto.
 
 ### 📅 El día elegido resalta toda su columna
 
-Lo que pediste desde el celular. Antes solo se marcaba el numerito del día en la
-cabecera; en el celular se ven tres columnas juntas y ese circulito no alcanzaba
-para saber cuál era la tuya. Ahora la **columna entera** se tiñe con el color de
-la sede, muy diluido, y las píldoras de hora siguen legibles encima.
+En el celular se ven tres columnas juntas y el circulito del número no alcanzaba
+para saber cuál era la tuya.
 
-### 🔧 El panel se adapta a varias sedes
+### 🖼️ Fondo
 
-| Sedes del trabajador | Qué ve |
-|---|---|
-| **Varias** | El filtro de sede aparece, con "Todas" + solo sus sedes |
-| **Una** | El filtro se oculta (un selector de una opción no sirve) |
-| **Ninguna** | Aviso claro en la cabecera: *"Todavía no tienes ninguna sede asignada"* |
+La capa sobre la foto de la Plaza Mayor bajó a **82 %**, en tres pasos a tu
+pedido: 93 % → 95,5 % → 90 % → **82 %**. Es el único valor que hay que mover.
 
 ---
 
-## 4. Cómo se verificó
+## 6. ⛔ Lo que falta y depende de ti
+
+### La cancelación por parte del socio (punto 15)
+
+Es lo que pediste: botón en el correo → pantalla con los datos de su cita →
+confirma → se cancela, se avisa a los correos de la sede y el horario se reabre.
+
+**Lo que ya está decidido y no hace falta preguntar:**
+
+- El enlace lleva un **token aleatorio**, nunca el `citas.id` — los uuid no son
+  secretos y con el id cualquiera cancelaría citas ajenas
+- El token **se invalida al usarse**
+- Avisa a los correos de `notificaciones_sede` de esa sede (que ya incluyen a
+  sus trabajadores)
+- El horario se libera **solo**: el trigger `trg_liberar_horario` ya lo hace
+- **No** se abre `select` ni `update` de `citas` al anónimo: va por una función
+  `SECURITY DEFINER` que recibe el token
+
+**❓ Lo único que falta que decidas: hasta cuándo puede cancelar.** Sin límite,
+alguien cancela 5 minutos antes y Luis se entera cuando ya perdió el turno. La
+sugerencia escrita en `TAREAS.md` es **hasta 2 horas antes**, pero es tu negocio.
+
+### Otras dos que siguen abiertas
+
+- **Punto 13** quedó sin piso: sin delegación, avisar al trabajador anterior de
+  una reasignación ya no existe. Avisar de una cancelación se **funde con el
+  punto 7**.
+- **¿Se limpian las columnas en desuso?** `citas.asignado_a` y
+  `perfiles.sede_id`. Ninguna molesta y las dos son el camino de vuelta. Antes de
+  borrarlas hay que quitar el trigger `trg_notificar_cita_delegada`.
+
+---
+
+## 7. Cómo se verificó
 
 ### Contra la base real, suplantando roles
 
 | Caso | Resultado |
 |---|---|
 | Trabajador con solo `jesus_maria` | 25 citas, **0** de otra sede |
-| Trabajador con `jesus_maria` + `magdalena` | **31** (25 + 6), 0 de Lince |
-| Trabajador con solo `magdalena` | **6**, 0 de Jesús María |
-| Trabajador **desactivado** | 0 |
-| `anon` (el socio) | 0 |
-| Crear un horario en una sede que **no** tiene | **rechazado**, `42501` RLS |
-| Crear un horario en una sede que **sí** tiene | pasó |
+| Con `jesus_maria` + `magdalena` | **31** (25 + 6), 0 de Lince |
+| Con solo `magdalena` | **6**, 0 de Jesús María |
+| Desactivado · `anon` | 0 · 0 |
+| Crear horario en sede que **no** tiene | **rechazado**, `42501` RLS |
+| Crear horario en sede que **sí** tiene | pasó |
 
-Las pruebas de escritura se corrieron en transacciones y se revirtieron.
+Las escrituras se corrieron en transacciones y se revirtieron.
 
-### Con navegador (Playwright), en PC (1280 px) y celular (390 px)
+### Con navegador (Playwright), PC y celular
 
-El flujo del socio, contra la base real. El panel, con las respuestas de Supabase
-interceptadas y la sesión falsificada — no tengo las claves de las cuentas
-reales, así que **el panel no se probó con credenciales de verdad**.
-
-- Admin: lista con chips por sede, editor con los checks correctos, y al guardar
-  **exactamente** dos peticiones: `POST perfil_sedes {magdalena}` y
-  `POST notificaciones_sede {magdalena, ese correo}`. **El Gmail de BioFit no se
-  tocó.**
-- Citas: sub-pestañas con sus contadores, solo una sección visible, el cambio
-  funciona, días agrupados (próximas ascendentes con el primero abierto;
-  historial descendente y todo cerrado)
-- Trabajador con 2 de 3 sedes: solo Citas y Horarios, filtro con "Todas + sus 2",
-  y la consulta saliendo con `sede_id=in.(jesus_maria,magdalena)`
-- Trabajador con 1 sede: filtro oculto · sin sedes: aviso visible
-- Socio: la columna del día elegido resaltada, en PC y en celular
+- **Realtime de verdad**: página abierta, `UPDATE` en `sedes` disparado desde la
+  base → **3 frames recibidos**, la página se repintó, cero errores
+- **El filtro del trabajador**: "todas" → 2 sedes · "magdalena" → solo Magdalena
+  · "jesus_maria" → solo Jesús María
+- **DNI**: `"123"` y `"1234567a"` rechazados **sin insertar nada**; `"12345678"`
+  manda `dni_cliente` correctamente. **No se creó ninguna cita real** (el insert
+  se interceptó)
+- **Horarios**: las 3 sub-pestañas, y "seleccionar todos los visibles" marcó 3
+  (los 4 libres menos uno que tiene una cita cancelada apuntándolo) y **0 en las
+  secciones ocultas**
+- **El editor de trabajador**: al guardar salieron **exactamente** dos
+  peticiones, `POST perfil_sedes` y `POST notificaciones_sede`. **El Gmail de
+  BioFit no se tocó**
+- El `=20`: probado en aislado, 2 líneas con espacio final antes y 0 después
 - `node --check` sobre cada módulo y sobre el bundle combinado
-- Sin desborde lateral en celular y **cero errores de consola** en todas las corridas
 
-**Tres cosas que se encontraron y se arreglaron así:**
+🚨 **Lo que sigue SIN probarse:** el panel con las cuentas reales. No tengo las
+claves, así que lo probé con las respuestas de Supabase interceptadas. Las
+políticas sí están probadas contra la base. Falta juntarlo con un login de verdad.
 
-1. En el alta, `.inline-form label` le ganaba a `.check-row` y ponía el check
-   **encima** del texto en vez de al lado.
-2. Un trabajador sin sedes generaba `sede_id=in.()`, que **PostgREST rechaza con
-   400**. Ahora se corta antes de consultar y muestra el aviso.
-3. Mi propia prueba del caso "sin sedes" no se estaba ejecutando (un `||` que
-   trataba la cadena vacía como falsa). Corregida y vuelta a correr.
+### ⚠️ Un susto propio, para que quede escrito
 
-🚨 **Lo que sigue SIN probarse:** el panel con las cuentas reales. La simulación
-cubre el render y qué peticiones salen; las políticas ya están probadas contra la
-base. Falta juntar las dos cosas con un login de verdad.
+Un script mío dejó **`panel.js` en 0 bytes**: abrí el archivo en modo escritura
+(que trunca de entrada) y la escritura falló a mitad por un carácter que no se
+podía codificar. Se restauró completo desde el último commit y se reaplicó el
+cambio. **Regla nueva: preparar el contenido y validarlo ANTES de abrir el
+archivo para escribir.**
 
 ---
 
-## 5. Qué toca AHORA
-
-1. **Cargar los horarios de Lince** desde el panel de admin.
-2. **Revisar el reparto de sedes** de cada trabajador en Usuarios → Editar.
-3. **Entrar con un trabajador de verdad** y confirmar que ve solo lo de sus sedes.
-4. **Mirar el mapa de Lince en el celular** y confirmar que el pin cae bien.
-5. Después: punto **10** de `TAREAS.md` (un clic), punto **11**, punto **17**.
-
----
-
-## 6. Decisiones que dependen de Christopher
-
-**1. El punto 13 quedó sin piso.** Sin delegación, avisar al trabajador anterior
-en una reasignación ya no existe. Avisar de una cancelación sigue teniendo
-sentido, pero el destinatario natural son los correos de la sede: **se funde con
-el punto 7**. Confirmar antes de tocarlo.
-
-**2. ¿Hace falta ver los horarios eliminados?** Hoy no se puede: al borrarlos
-desaparece la fila. Implicaría archivar en vez de borrar, y eso toca la base.
-
-**3. ¿Se limpian las columnas en desuso?** Quedan dos: `citas.asignado_a` y
-ahora `perfiles.sede_id`. Ninguna molesta, y las dos son el camino de vuelta si
-algo sale mal. Cuando pase un tiempo, se pueden borrar — antes hay que quitar el
-trigger `trg_notificar_cita_delegada`.
-
----
-
-## 7. Reglas que no se rompen
+## 8. Reglas que no se rompen
 
 1. **`service_role` NUNCA en el frontend.** La `anon key` sí va.
 2. **No tocar el patrón de `notify-cita`**: 200 inmediato + `EdgeRuntime.waitUntil`.
-3. **Los mapas NO llevan API key de Google.** `output=embed` + Maps URLs.
-4. **Fechas con `isoLocal()`**, nunca `toISOString().slice(0,10)`.
-5. **"Ocupado" se deriva de `horarios_disponibles.disponible`**, nunca de cruzar
-   con `citas`.
-6. **Sedes: todo sale de la base** — nombres, direcciones, colores y mapas. Ni la
-   portada puede nombrarlas a mano.
-7. **Las sedes del trabajador salen de `perfil_sedes`**, nunca de
-   `perfiles.sede_id`, que está en desuso. En las políticas,
-   `sede_id in (select mis_sedes())`.
-8. **⚠️ `horarios_disponibles` se lee EN ABIERTO** (el socio ve los cupos), así
-   que RLS **no** acota la lectura del trabajador. Recortarla a sus sedes lo hace
-   el frontend, en `cargarHorarios()`. No es cosmético: si se quita, el
-   trabajador ve los horarios de todas las sedes.
-9. **Migrar solo lo aprobado, avisando antes y dejándolo anotado acá después.**
-   Aprobadas y todavía sin hacer: `citas.cancelada_por` (punto 7) y
-   `citas.dni_cliente` nullable (punto 14).
-10. **Nada de lo que ya funciona puede dejar de funcionar.**
-11. Flujo: `editar /src` → `python build.py` → `git add -A` → `git commit` → `git push`.
-12. **El color de la sede nunca se usa como texto sobre blanco**, y en el panel
-    el calendario va con la paleta de la marca.
-13. **El alta de horarios en lote usa `ignoreDuplicates: true`.**
-14. **Un horario con cualquier cita apuntándolo no se puede borrar**, aunque esté
+3. **El HTML de los correos va en UNA línea** (`compactar()`). Con sangrado
+   vuelven los `=20`.
+4. **Realtime solo emite lo que está en la publicación `supabase_realtime`**:
+   hoy `citas`, `horarios_disponibles`, `sedes`, `perfil_sedes`. Suscribirse a
+   otra tabla **no da error**, simplemente no llega nada.
+5. **Los mapas NO llevan API key de Google.** `output=embed` + Maps URLs.
+6. **Fechas con `isoLocal()`**, nunca `toISOString().slice(0,10)`.
+7. **"Ocupado" se deriva de `horarios_disponibles.disponible`**, nunca de cruzar
+   con `citas`. El cruce solo dice POR QUÉ no está disponible y cuál no se puede
+   borrar.
+8. **Sedes: todo sale de la base.** Ni la portada puede nombrarlas a mano.
+9. **Las sedes del trabajador salen de `perfil_sedes`**, nunca de
+   `perfiles.sede_id`, que está en desuso.
+10. **⚠️ `horarios_disponibles` se lee EN ABIERTO** (el socio ve los cupos), así
+    que RLS **no** acota la lectura del trabajador. Recortarla a sus sedes lo
+    hace el frontend, en `cargarHorarios()`. Si se quita, ve los de todas.
+11. **Las casillas de borrado en lote se acotan a `.grupo:not(.hidden)`.** Si no,
+    "todos los visibles" incluye lo que está en otra sub-pestaña.
+12. **Migrar solo lo aprobado, avisando antes y dejándolo anotado acá después.**
+    Aprobada y sin hacer: `citas.cancelada_por` (punto 7).
+13. **Nada de lo que ya funciona puede dejar de funcionar.**
+14. Flujo: `editar /src` → `python build.py` → `git add -A` → `git commit` → `git push`.
+15. **El color de la sede nunca se usa como texto sobre blanco.**
+16. **El alta de horarios en lote usa `ignoreDuplicates: true`.**
+17. **Un horario con cualquier cita apuntándolo no se puede borrar**, aunque esté
     cancelada.
-15. **Los correos de los trabajadores los manda la pestaña Usuarios.**
-16. **La sincronización de correos toca solo las filas de ese email.** Nunca
-    barrer `notificaciones_sede` entera.
-17. **Toda imagen nueva se comprime antes de entrar a `src/assets/`**: `build.py`
+18. **Los correos de los trabajadores los manda la pestaña Usuarios**, y la
+    sincronización toca **solo** las filas de ese email.
+19. **Toda imagen nueva se comprime antes de entrar a `src/assets/`**: `build.py`
     las incrusta en base64, así que cada KB del archivo son ~1,34 KB de página.
