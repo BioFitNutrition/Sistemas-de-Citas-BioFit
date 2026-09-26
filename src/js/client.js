@@ -77,6 +77,8 @@ export function initClientFlow() {
     onSeleccion: (iso) => saltarASemanaDe(iso),
   });
 
+  document.getElementById("proximamente-otra").addEventListener("click", () => showView("view-sede"));
+
   document.getElementById("week-prev").addEventListener("click", () => cambiarSemana(-1));
   document.getElementById("week-next").addEventListener("click", () => cambiarSemana(1));
 
@@ -231,9 +233,11 @@ async function cargarDisponibilidad(sedeId) {
   const loading = document.getElementById("calendario-loading");
   const empty = document.getElementById("calendario-empty");
   const wrap = document.getElementById("calendario-wrap");
+  const pronto = document.getElementById("calendario-proximamente");
 
   loading.classList.remove("hidden");
   empty.classList.add("hidden");
+  pronto.classList.add("hidden");
   wrap.classList.add("hidden");
 
   const { data, error } = await supabase
@@ -262,8 +266,22 @@ async function cargarDisponibilidad(sedeId) {
 
   const fechas = Object.keys(porFecha).sort();
   if (fechas.length === 0) {
-    empty.textContent = "No hay horarios disponibles por ahora. Vuelve a intentarlo más tarde.";
-    empty.classList.remove("hidden");
+    // Sin cupos hay dos casos muy distintos: la sede que se quedó sin horas
+    // libres, y la que todavía no abrió agenda. A la segunda no se le dice
+    // "vuelve más tarde", se le anuncia. Se distinguen preguntando si la sede
+    // tiene ALGÚN horario cargado, sin filtrar por fecha ni disponibilidad.
+    const { count } = await supabase
+      .from("horarios_disponibles")
+      .select("id", { count: "exact", head: true })
+      .eq("sede_id", sedeId);
+
+    if (count === 0) {
+      document.getElementById("proximamente-sede").textContent = getSede(sedeId)?.nombre || "Esta sede";
+      pronto.classList.remove("hidden");
+    } else {
+      empty.textContent = "No hay horarios disponibles por ahora. Vuelve a intentarlo más tarde.";
+      empty.classList.remove("hidden");
+    }
     return;
   }
 

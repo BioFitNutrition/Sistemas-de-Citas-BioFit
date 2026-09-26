@@ -1,11 +1,12 @@
 // Edge Function: notify-cita
 // Envía los correos del sistema usando el Gmail de BioFit vía SMTP.
 //
-// Tres tipos de correo:
-//   1. Cita nueva    -> aviso interno a los correos de `notificaciones_sede`
-//   2. Cita nueva    -> confirmación al socio
-//   3. Cita delegada -> aviso al trabajador asignado (EN DESUSO: la delegación
-//      se eliminó el 25/09/2026 y su trigger ya no se dispara)
+// Cuatro tipos de correo:
+//   1. Cita nueva      -> aviso interno a los correos de `notificaciones_sede`
+//   2. Cita nueva      -> confirmación al socio
+//   3. Cita cancelada  -> aviso interno a los correos de `notificaciones_sede`
+//   4. Cita delegada   -> aviso al trabajador asignado (EN DESUSO: la delegación
+//      se eliminó el 25/09/2026 y su trigger ya no existe)
 //
 // IMPORTANTE: responde 200 de inmediato y manda el correo en SEGUNDO PLANO
 // (EdgeRuntime.waitUntil). Conectarse a Gmail por SMTP puede tardar varios
@@ -85,6 +86,60 @@ function compactar(html: string): string {
   return html.replace(/[ \t]*\r?\n[ \t]*/g, " ").trim();
 }
 
+// ⚠️ NO QUITAR, y NO volver a pasarle el asunto crudo a denomailer.
+//
+// denomailer 1.6.0 pasa el asunto por quotedPrintableEncodeInline(), que arma
+// UN SOLO encoded-word `=?utf-8?Q?...?=` con tres defectos encadenados:
+//   1. deja los espacios literales dentro del encoded-word, cosa que RFC 2047
+//      prohíbe — por eso Gmail ni lo intenta decodificar y lo muestra crudo;
+//   2. no lo corta en los 75 caracteres que exige la norma;
+//   3. y encima le mete un salto de línea cada 74 caracteres SIN el espacio de
+//      continuación.
+// Ese tercer punto es el que rompe el correo entero: el salto parte la cabecera
+// `Subject` en dos, la segunda mitad ya no tiene forma de cabecera, el lector da
+// por cerrada la zona de cabeceras ahí mismo y TODO lo que sigue (From, To,
+// Date, los boundaries MIME y el HTML) se muestra como texto plano.
+// Pasó en producción el 26/09/2026 con el asunto
+// "Nueva cita: Mónica Rivera carranza — Sede Jesús María".
+//
+// Aquí la cabecera se arma bien: encoded-words en Base64, cortados en límites de
+// carácter y plegados con CRLF + espacio, que sí es la continuación válida.
+//
+// El espacio del principio NO es un descuido: quotedPrintableEncodeInline()
+// vuelve a codificar todo lo que empiece con "=?", así que sin ese espacio
+// nuestro trabajo quedaría codificado dos veces. Con él ve ASCII puro que no
+// empieza con "=?" y lo deja pasar intacto, que es justo lo que queremos.
+function asuntoCabecera(asunto: string): string {
+  const limpio = asunto.replace(/[\r\n]+/g, " ").trim();
+
+  // Solo ASCII imprimible y corto: no hay nada que codificar ni que plegar.
+  if (!/[^\x20-\x7E]/.test(limpio) && limpio.length <= 68) return limpio;
+
+  const enc = new TextEncoder();
+  const trozos: string[] = [];
+  let actual: number[] = [];
+
+  for (const ch of limpio) {
+    const bytes = Array.from(enc.encode(ch));
+    // 36 bytes -> 48 caracteres de Base64 -> 60 con el envoltorio: holgado bajo
+    // los 75 del RFC, y la primera línea queda en 70 contando "Subject: ".
+    if (actual.length + bytes.length > 36) {
+      trozos.push(aBase64(actual));
+      actual = [];
+    }
+    actual.push(...bytes);
+  }
+  if (actual.length > 0) trozos.push(aBase64(actual));
+
+  return " " + trozos.map((t) => `=?UTF-8?B?${t}?=`).join("\r\n ");
+}
+
+function aBase64(bytes: number[]): string {
+  let binario = "";
+  for (const b of bytes) binario += String.fromCharCode(b);
+  return btoa(binario);
+}
+
 async function enviarCorreo(destinatarios: string[], asunto: string, html: string) {
   if (destinatarios.length === 0) return;
   if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
@@ -104,13 +159,14 @@ async function enviarCorreo(destinatarios: string[], asunto: string, html: strin
   });
 
   const cuerpo = compactar(html);
+  const cabecera = asuntoCabecera(asunto);
 
   try {
     for (const to of destinatarios) {
       await client.send({
         from: `BioFit Consulting <${GMAIL_USER}>`,
         to,
-        subject: asunto,
+        subject: cabecera,
         content: "auto",
         html: cuerpo,
       });
@@ -129,17 +185,20 @@ async function datosSede(sedeId: string) {
   return { nombre: data?.nombre ?? sedeId, direccion: data?.direccion ?? "" };
 }
 
+async function correosDeSede(sedeId: string): Promise<string[]> {
+  const { data } = await db
+    .from("notificaciones_sede")
+    .select("email")
+    .eq("sede_id", sedeId)
+    .eq("activo", true);
+  return (data ?? []).map((c: { email: string }) => c.email);
+}
+
 async function citaNueva(cita: Record<string, any>) {
   const sede = await datosSede(cita.sede_id);
   const cuando = `${formatearFecha(cita.fecha)} · ${formatearHora(cita.hora)}`;
 
-  const { data: correos } = await db
-    .from("notificaciones_sede")
-    .select("email")
-    .eq("sede_id", cita.sede_id)
-    .eq("activo", true);
-
-  const destinatarios = (correos ?? []).map((c: { email: string }) => c.email);
+  const destinatarios = await correosDeSede(cita.sede_id);
   console.log(`Cita nueva en ${sede.nombre}. Avisos internos: ${destinatarios.length}`);
 
   if (destinatarios.length > 0) {
@@ -164,6 +223,38 @@ async function citaNueva(cita: Record<string, any>) {
     `);
     await enviarCorreo([cita.email_cliente], `Tu cita en BioFit — ${cuando}`, html);
   }
+}
+
+// Quién canceló sale de `cancelada_por_origen`, que lo llena la base (el
+// trigger trg_marcar_quien_cancelo, o la función del token cuando es el socio).
+// El frontend no lo manda: si lo mandara, un trabajador podría decir que canceló
+// el admin.
+function quienCancelo(origen: string | null | undefined): string {
+  if (origen === "socio") return "El socio, desde el enlace de su correo";
+  if (origen === "admin") return "El administrador, desde el panel";
+  if (origen === "trabajador") return "Un trabajador, desde el panel";
+  return "Sin registrar";
+}
+
+async function citaCancelada(cita: Record<string, any>) {
+  const sede = await datosSede(cita.sede_id);
+  const cuando = `${formatearFecha(cita.fecha)} · ${formatearHora(cita.hora)}`;
+
+  const destinatarios = await correosDeSede(cita.sede_id);
+  console.log(`Cita cancelada en ${sede.nombre}. Avisos internos: ${destinatarios.length}`);
+  if (destinatarios.length === 0) return;
+
+  const html = plantilla("Cita cancelada", `
+    <p style="margin:0 0 16px;font-size:14px;color:#171a1c">Se canceló esta cita y el horario volvió a quedar libre para reservar.</p>
+    ${filaDato("Socio", esc(cita.nombre_cliente))}
+    ${cita.dni_cliente ? filaDato("DNI", esc(cita.dni_cliente)) : ""}
+    ${filaDato("Sede", esc(sede.nombre))}
+    ${filaDato("Era para", esc(cuando))}
+    ${filaDato("Teléfono", esc(cita.telefono_cliente))}
+    ${filaDato("Canceló", esc(quienCancelo(cita.cancelada_por_origen)))}
+  `);
+
+  await enviarCorreo(destinatarios, `Cita cancelada: ${cita.nombre_cliente} — ${sede.nombre}`, html);
 }
 
 async function citaDelegada(cita: Record<string, any>) {
@@ -199,6 +290,8 @@ async function procesar(tipo: string, registro: Record<string, any>, anterior: R
   try {
     if (tipo === "INSERT") {
       await citaNueva(registro);
+    } else if (tipo === "CANCELADA") {
+      await citaCancelada(registro);
     } else if (tipo === "UPDATE") {
       const cambioAsignacion = registro.asignado_a && registro.asignado_a !== anterior?.asignado_a;
       if (cambioAsignacion && registro.estado !== "cancelada") {

@@ -21,7 +21,7 @@
 -- 1. TABLAS
 -- ============================================================
 
--- ---- Sedes (2 filas fijas) ----
+-- ---- Sedes (3 filas) ----
 create table sedes (
   id         text primary key,      -- 'magdalena' | 'jesus_maria'
   nombre     text not null,
@@ -34,6 +34,12 @@ create table sedes (
 -- Valores actuales:
 --   magdalena    'Sede Magdalena del Mar'  'Av. del Ejército 1360, Magdalena del Mar'  #16a34a
 --   jesus_maria  'Sede Jesús María'        'Av. General Garzón 1123, Jesús María'      #eab308
+--   lince        'Sede Lince'              'Av. Petit Thouars 1860, Lince'             #147362
+--
+-- ⚠️ Lince NO lleva coordenadas, lleva el nombre del local. De las otras dos se
+-- conocen lat/lng; de Lince no salían, y un pin inventado manda al socio a la
+-- cuadra equivocada. Sus dos URLs buscan el texto «XFLY Lince, Av. Petit
+-- Thouars 1860» y dejan que Google lo resuelva.
 --
 -- Los mapas NO usan API key de Google (la Embed API oficial exige cuenta de
 -- facturación con tarjeta, y el proyecto no puede tener eso):
@@ -113,11 +119,32 @@ create table citas (
   created_at       timestamptz not null default now(),
   -- ⚠️ EN DESUSO desde el 25/09/2026: era la delegación cita por cita, que se
   -- eliminó. Se conserva como historial; el frontend no la escribe ni la lee.
-  asignado_a       uuid references perfiles(id) on delete set null
+  asignado_a       uuid references perfiles(id) on delete set null,
+
+  -- ---- Cancelación por parte del socio (26/09/2026) ----
+  -- Secreto del enlace que va en el correo del socio. NUNCA se usa el id de la
+  -- cita: los uuid no son secretos y con el id cualquiera cancelaría citas
+  -- ajenas. Son 64 caracteres hex (256 bits) y se pone en NULL al usarse.
+  -- ⚠️ NO exponerlo jamás al frontend.
+  token_cancelacion    text default nuevo_token_cancelacion(),
+  -- Quién canceló, cuando lo hizo alguien con sesión. NULL si canceló el socio:
+  -- no tiene perfil.
+  cancelada_por        uuid references perfiles(id),
+  -- 'socio' | 'trabajador' | 'admin'. Lo llena un trigger, NO el frontend: si lo
+  -- mandara el frontend, un trabajador podría decir que canceló el admin.
+  cancelada_por_origen text,
+  cancelada_en         timestamptz,
+
+  constraint citas_cancelada_origen_ck
+    check (cancelada_por_origen in ('socio', 'trabajador', 'admin'))
 );
 
 create index idx_citas_sede_fecha on citas (sede_id, fecha);
 create index idx_citas_asignado   on citas (asignado_a);
+
+-- Parcial: las citas ya canceladas tienen el token en NULL y no deben chocar.
+create unique index idx_citas_token on citas (token_cancelacion)
+  where token_cancelacion is not null;
 
 -- ⚠️ citas.horario_id NO tiene ON DELETE. Por lo tanto un horario con
 --    CUALQUIER cita apuntándolo no se puede borrar, aunque esa cita esté
@@ -186,6 +213,52 @@ grant execute on function mi_rol(), es_admin(), es_trabajador(), mi_sede(), mis_
   to authenticated;
 
 
+-- ---- Cancelación por parte del socio (26/09/2026) ----
+-- El socio NO tiene sesión, y aun así puede cancelar desde el enlace del correo.
+-- ⚠️ NO se le abre `select` ni `update` sobre `citas` al rol anónimo: estas dos
+-- funciones SECURITY DEFINER son la única puerta, y solo se pasa con el token.
+-- Ninguna devuelve el token, ni el id de la cita, ni el correo o el teléfono del
+-- socio: solo lo justo para que reconozca su cita antes de confirmar.
+
+-- Dos uuid concatenados y sin guiones = 64 caracteres hex. Se usa esto en vez
+-- de gen_random_bytes() para no depender de que pgcrypto esté instalado.
+create or replace function nuevo_token_cancelacion() returns text
+language sql volatile as $$
+  select replace(gen_random_uuid()::text, '-', '') ||
+         replace(gen_random_uuid()::text, '-', '');
+$$;
+
+-- ⚠️ El cuerpo completo de las dos funciones de abajo NO se copia acá para no
+--    tener dos versiones que se desincronicen. Está entero, y con su SQL de
+--    reversa, en:
+--        supabase/migraciones/2026-09-26-cancelacion-por-el-socio.sql
+--
+-- cita_por_token(p_token text)
+--   -> table (nombre_cliente, fecha, hora, sede_nombre, sede_direccion,
+--             estado, puede_cancelar boolean, motivo text)
+--   STABLE SECURITY DEFINER. Cero filas = enlace inválido o ya usado.
+--   Rechaza de entrada cualquier token que no mida 64 caracteres.
+--
+-- cancelar_cita_por_token(p_token text)
+--   -> jsonb: {"ok": true} | {"ok": false, "motivo": "..."}
+--   VOLATILE SECURITY DEFINER. Usa SELECT ... FOR UPDATE: si el socio hace doble
+--   clic, la segunda llamada espera y encuentra la cita ya cancelada en vez de
+--   cancelarla dos veces. Deja `cancelada_por_origen = 'socio'` ANTES de que
+--   corra trg_marcar_quien_cancelo, que no lo pisa porque aquí auth.uid() es
+--   NULL. El token lo borra ese mismo trigger, y trg_liberar_horario suelta el
+--   cupo solo.
+--
+-- El PLAZO en ambas es de 2 HORAS antes de la cita (decisión de Christopher,
+-- 26/09/2026). La cita está en hora de Lima y `now()` es timestamptz, así que la
+-- hora local se convierte a un instante real antes de restar:
+--     limite := ((fecha + hora) at time zone 'America/Lima') - interval '2 hours'
+
+revoke all on function nuevo_token_cancelacion() from public, anon;
+revoke all on function cita_por_token(text), cancelar_cita_por_token(text) from public;
+grant execute on function cita_por_token(text), cancelar_cita_por_token(text)
+  to anon, authenticated;
+
+
 -- ============================================================
 -- 3. TRIGGERS
 -- ============================================================
@@ -250,14 +323,14 @@ begin
   if tg_op = 'INSERT' then
     cuerpo := jsonb_build_object('type','INSERT','record', to_jsonb(new));
   else
-    -- Solo avisamos cuando la cita pasa a estar asignada a alguien distinto.
-    if new.asignado_a is null
-       or new.asignado_a is not distinct from old.asignado_a
-       or new.estado = 'cancelada' then
+    -- Desde el 26/09/2026 avisa de las CANCELACIONES (antes se cortaba en seco
+    -- cuando la cita quedaba cancelada, así que no avisaba a nadie).
+    if new.estado = 'cancelada' and old.estado is distinct from 'cancelada' then
+      cuerpo := jsonb_build_object('type','CANCELADA','record', to_jsonb(new),
+                                   'old_record', to_jsonb(old));
+    else
       return new;
     end if;
-    cuerpo := jsonb_build_object('type','UPDATE','record', to_jsonb(new),
-                                 'old_record', to_jsonb(old));
   end if;
 
   perform net.http_post(
@@ -274,14 +347,41 @@ $$;
 create trigger trg_notificar_cita_nueva
 after insert on citas for each row execute function notificar_cita();
 
--- Inofensivo pero ya muerto: nada vuelve a escribir `asignado_a`, así que nunca
--- se dispara. Hay que quitarlo ANTES de borrar la columna algún día.
-create trigger trg_notificar_cita_delegada
-after update of asignado_a on citas for each row execute function notificar_cita();
+-- Reemplazó a trg_notificar_cita_delegada, que se eliminó el 26/09/2026: nada
+-- volvía a escribir `asignado_a`, así que nunca se disparaba.
+create trigger trg_notificar_cita_cancelada
+after update of estado on citas for each row execute function notificar_cita();
+
+
+-- ---- Deja escrito quién canceló, venga de donde venga (26/09/2026).
+-- Lo llena la base y no el frontend porque `auth.uid()` no se puede falsificar.
+-- Cuando cancela el SOCIO entra por cancelar_cita_por_token(), que la llama el
+-- anónimo: ahí auth.uid() es NULL, este trigger no toca el origen y queda el
+-- 'socio' que dejó puesto la función.
+create or replace function marcar_quien_cancelo() returns trigger
+language plpgsql security definer set search_path = public, pg_temp as $$
+begin
+  if new.estado = 'cancelada' and old.estado is distinct from 'cancelada' then
+    new.cancelada_en := coalesce(new.cancelada_en, now());
+
+    if auth.uid() is not null then
+      new.cancelada_por        := auth.uid();
+      new.cancelada_por_origen := coalesce(mi_rol(), 'trabajador');
+    end if;
+
+    -- El enlace del correo deja de servir en cuanto la cita queda cancelada.
+    new.token_cancelacion := null;
+  end if;
+  return new;
+end $$;
+
+create trigger trg_marcar_quien_cancelo
+before update of estado on citas for each row execute function marcar_quien_cancelo();
 
 -- Son funciones de trigger: no deben poder invocarse desde la API REST.
 revoke all on function marcar_horario_ocupado(), liberar_horario_si_cancela(),
-                      fijar_creador_horario(), notificar_cita()
+                      fijar_creador_horario(), notificar_cita(),
+                      marcar_quien_cancelo()
   from anon, authenticated, public;
 
 -- ⚠️ notify-cita responde 200 de inmediato y manda el correo en segundo plano

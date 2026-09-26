@@ -158,6 +158,27 @@
     <p id="calendario-loading" class="loading">Cargando horarios...</p>
     <p id="calendario-empty" class="empty-state hidden">No hay horarios disponibles por ahora. Vuelve a intentarlo más tarde.</p>
 
+    <section id="calendario-proximamente" class="proximamente hidden" aria-live="polite">
+      <span class="proximamente__icono" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 21v-8"/>
+          <path d="M12 13c0-3.3 2.7-6 6-6 0 3.3-2.7 6-6 6Z"/>
+          <path d="M12 16c0-2.8-2.2-5-5-5 0 2.8 2.2 5 5 5Z"/>
+        </svg>
+      </span>
+      <span class="proximamente__badge">Próximamente</span>
+      <h3 class="proximamente__titulo">Aquí todavía no, pero falta poco</h3>
+      <p class="proximamente__texto">
+        <strong id="proximamente-sede"></strong> ya tiene local, dirección y equipo.
+        Lo único que falta son los horarios de atención: los estamos armando para
+        abrirlos completos, no a medias.
+      </p>
+      <p class="proximamente__nota">
+        Mientras tanto te atendemos en nuestras otras sedes, con la misma asesoría de 20 minutos.
+      </p>
+      <button type="button" id="proximamente-otra" class="btn-primary">Ver las otras sedes</button>
+    </section>
+
     <div id="calendario-wrap" class="gcal hidden">
       <div id="mini-cal-host" class="gcal__mini"></div>
 
