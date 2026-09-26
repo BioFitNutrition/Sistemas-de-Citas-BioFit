@@ -13,187 +13,157 @@
 
 | | |
 |---|---|
-| **Fecha** | 15/09/2026 |
+| **Fecha** | 25/09/2026 |
 | **Última escritura** | Claude Code |
-| **Siguiente** | Christopher — `git push` (queda **1 commit** sin subir) y probar el panel con la cuenta de Luis |
+| **Siguiente** | Christopher — **probar con la cuenta de Luis y con un trabajador real** (todo lo demás está aplicado y subido) |
 
-⚠️ **Falta subir 1 commit.** El del calendario compartido ya se publicó; el de
-hoy (las dos secciones y el agrupado por día) todavía no.
+## ✅ No queda nada bloqueando
 
-```
-(último)  Horarios del panel: dos secciones, agrupados por día, color de marca   ← SIN SUBIR
-161bfcc   Calendario compartido: socio, alta en lote y borrado en lote           ← publicado
-0f8a231   Arregla el bug del trabajador, mini mapa e interfaz                    ← publicado
-```
+La migración **ya se corrió**, el `schema.sql` está al día, el trabajo del
+frontend está **commiteado y subido**. No hay nada pendiente de correr a mano ni
+de subir.
 
 ---
 
-## 2. Dónde estamos
+## 2. Cambios en la base
+
+**Migración aplicada:** `citas_visibles_por_sede` — 25/09/2026, por Claude Code,
+con el visto bueno de Christopher.
+
+Archivo: `supabase/migraciones/2026-09-25-citas-por-sede.sql` (queda sellado como
+APLICADA, con el SQL de reversa al final).
+
+Qué hizo: cambió las políticas RLS de **SELECT y UPDATE de `citas`** para el rol
+`authenticated`. El trabajador ya no ve "las citas que le asignaron" sino **las
+de su sede**:
+
+```sql
+-- se quitaron (modelo viejo, basado en la delegación ya eliminada)
+using (es_admin() or (es_trabajador() and asignado_a = auth.uid()))
+
+-- quedaron
+create policy "citas: admin todas, trabajador su sede o ambas (ver)"
+  on public.citas for select to authenticated
+  using (es_admin() or (es_trabajador()
+         and (mi_sede() is null or sede_id = mi_sede())));
+
+create policy "citas: admin todas, trabajador su sede o ambas (editar)"
+  on public.citas for update to authenticated
+  using      (es_admin() or (es_trabajador()
+              and (mi_sede() is null or sede_id = mi_sede())))
+  with check (es_admin() or (es_trabajador()
+              and (mi_sede() is null or sede_id = mi_sede())));
+```
+
+**No se tocó** el INSERT del socio anónimo, ni el DELETE (sigue siendo solo del
+admin), ni ninguna columna. `citas.asignado_a` sigue ahí como historial.
+
+**Verificado contra la base real, suplantando cada rol:**
+
+| Quién | Citas que ve | De la otra sede |
+|---|---|---|
+| Admin (`sede_id` NULL) | **31** (todas) | — |
+| Trabajador de Jesús María, activo | **25** | **0** |
+| Trabajador **desactivado** | **0** | — |
+| `anon` (el socio) | **0** | — |
+
+Esto era lo que la simulación no podía cubrir. Ya está cubierto.
+
+⚠️ Pero sigue **sin probarse desde el navegador con sesión real** — la política
+está bien, lo que falta es confirmar que el panel la aprovecha bien. Ver punto 4.
+
+---
+
+## 3. Dónde estamos
 
 El sistema **está en producción y funcionando**. No es un prototipo.
 
-- Base de datos completa y verificada en Supabase (`snuefzvfhucgfllnifat`)
-- Frontend modular publicado en GitHub Pages (un commit atrás, ver arriba)
+- Base de datos completa y verificada en Supabase (`snuefzvfhucgfllnifat`),
+  Postgres 17, `ACTIVE_HEALTHY`
+- 5 tablas con RLS activo: `sedes` (2) · `horarios_disponibles` (319) ·
+  `citas` (31) · `perfiles` (4) · `notificaciones_sede` (3)
+- Frontend modular publicado en GitHub Pages, **al día con `main`**
 - Las dos Edge Functions **desplegadas y activas** (`notify-cita`, `crear-usuario`)
 - **Los correos funcionan y están probados en producción**
-- 3 roles funcionando: socio (anónimo), trabajador, admin. RLS los separa de
-  verdad, no solo ocultando botones
-
-✅ **No hay bugs conocidos en producción.**
+- 3 roles: socio (anónimo), trabajador, admin. RLS los separa de verdad
 
 ---
 
-## 3. Qué cambió la última vez
+## 4. Qué toca AHORA — todo es prueba manual
 
-**Solo frontend (`/src`). La base de datos no se tocó.** Tres cambios en la
-pestaña **Horarios** del panel, todos pedidos por Christopher.
+Nada de esto lo puedo hacer yo: hace falta abrir la web y entrar con las cuentas.
 
-### 📂 La lista se partió en dos secciones
+1. **Con la cuenta de Luis (admin):** crear un trabajador de prueba con una sede,
+   ver que aparece en Correos; cambiarle la sede y ver cómo se mueve el correo;
+   desactivarlo y ver que desaparece.
+2. **Con ese trabajador:** que vea las citas de su sede y ninguna de la otra, y
+   que no le salga ningún botón de borrar.
+3. **Crear y borrar horarios de verdad** con sesión de admin (viene pendiente de
+   dos tandas atrás; el código ya se probó en navegador, pero no contra la base).
 
-Antes iba todo mezclado y no se distinguía qué quedaba realmente libre:
+Después de eso, lo siguiente por valor:
 
-| Sección | Qué lleva |
-|---|---|
-| **Libres** | creados y todavía reservables (`disponible = true`) |
-| **Reservados o deshabilitados** | ya no se pueden reservar: o tienen una cita, o se deshabilitaron a mano |
-
-Cada una con su propio contador. Dentro de la segunda, la etiqueta de cada fila
-sigue diciendo si es **Ocupado** (tiene cita) o **Deshabilitado** (a mano).
-
-⚠️ **Los horarios ELIMINADOS no se pueden listar:** al borrarlos se va la fila de
-la base, no queda nada que mostrar. Si algún día hace falta el historial de
-borrados, habría que agregar una columna de "archivado" en vez de borrar de
-verdad — eso sí tocaría la base y hay que decidirlo aparte.
-
-### 📅 Agrupados por día, desplegables
-
-Una fila por horario llenaba la pantalla: una semana cargada son cientos. Ahora
-**cada día es una sola fila** que se despliega para ver sus horas.
-
-- La cabecera del día muestra la fecha, cuántos horarios tiene y la franja que
-  cubre (`5:00pm – 6:20pm`), que es lo único que hace falta con el día cerrado
-- Se abre el primer día de cada sección; el resto arranca cerrado
-- **Se recuerda qué días dejaste abiertos**, para que recargar la lista (al
-  habilitar un horario, o por realtime) no te los cierre en la cara
-- Casilla por día para marcar todas sus horas de una vez, con estado "a medias"
-  cuando solo algunas están marcadas. Su clic no abre ni cierra el desplegable
-- Dentro del día, cada fila muestra la **hora** (`5:00 – 5:20pm`), no la fecha:
-  la fecha ya está en la cabecera
-
-### 🎨 El calendario del panel usa la paleta del sistema
-
-Se teñía con el color de la sede y el amarillo de Jesús María no pegaba en una
-pantalla interna. Ahora va siempre con el **teal de la marca (`#147362`)**,
-elijas la sede que elijas.
-
-El color por sede se queda donde sí sirve: **el calendario del socio** (lo orienta
-sobre dónde va a ir) y **los chips de las listas** (identifican la sede de un
-vistazo). Ahí sigue aplicando la regla de contraste: el color crudo va de fondo,
-borde o punto, nunca de texto.
-
-### Extra
-
-Al habilitar o deshabilitar un horario ahora sale un aviso diciendo a qué sección
-se movió. Sin eso, el horario simplemente desaparecía de donde estabas mirando.
-
-### Archivos tocados
-
-`src/js/panel.js` · `src/css/styles.css`
-→ `python build.py` regeneró el `index.html` de la raíz (776 KB).
+4. Punto **10** de `TAREAS.md` — un clic en el dashboard (protección de
+   contraseñas filtradas). Es lo más rápido que hay.
+5. Punto **11** — "¿Olvidaste tu contraseña?".
+6. Punto **17** — recordatorios con `pg_cron`. Va **antes** que el 16 (Google
+   Calendar): resuelve el mismo pedido sin depender de Google.
 
 ---
 
-## 4. Cómo se verificó
+## 5. Qué cambió en el código la última vez
 
-Esta vez **sí se pudo probar la vista de administrador**, sin tocar la base: se
-siembra una sesión en `localStorage` y se interceptan las respuestas de Supabase
-con datos de prueba (Playwright). Eso cubre los caminos que antes quedaron sin
-probar por no tener credenciales.
+La tanda del frontend (delegación eliminada, correos por sede, citas en dos
+secciones, botón "Soy nuevo") **ya está commiteada y subida**. El detalle vive en
+`TAREAS.md`, puntos 6 y 9, y en el mensaje del commit.
 
-Con un juego de 9 horarios repartidos en 3 días (uno con cita confirmada, uno con
-cita cancelada, uno deshabilitado a mano) se comprobó:
-
-- Las dos secciones, con sus contadores: **Libres 6**, **Reservados o
-  deshabilitados 3**
-- El agrupado por día y las cabeceras: *"Domingo, 20 de setiembre · 4 horarios ·
-  5:00pm – 6:20pm"*
-- El primer día abierto y el resto cerrado
-- 9 casillas, **2 deshabilitadas** con su motivo a la vista ("tiene una cita" /
-  "cita cancelada en el historial")
-- Las etiquetas de la segunda sección: Ocupado, Deshabilitado, Deshabilitado
-- Marcar el día entero → "Eliminar 4 horarios"; marcar todos los visibles →
-  "Eliminar 7 horarios" (los 9 menos los 2 bloqueados); marcar una sola hora deja
-  la casilla del día **a medias**
-- El calendario del panel se queda en `#147362` aunque se elija Jesús María
-- Celular (390 px): **sin scroll horizontal**
-- Sin errores de consola
-
-También se repitió la regresión del **flujo del socio** contra la base real
-(elegir sede → día → horario → formulario, sin reservar nada): sigue intacto, y
-su calendario conserva el color de la sede.
-
-🚨 **Lo que sigue SIN probarse contra la base real** (necesita la cuenta de Luis):
-
-1. **Crear horarios de verdad** — el `INSERT` con RLS de admin y de trabajador
-2. **El recuento "X creados, Y ya existían"** con datos reales
-3. **El borrado en lote** ejecutándose de verdad
-4. Que el **trabajador** no vea casillas ni botón de eliminar, y que vea la cita
-   delegada de la otra sede (esto viene pendiente de dos tandas atrás)
-
-La simulación cubre el render y la interacción, pero **no** las políticas RLS ni
-los triggers: eso solo se confirma entrando con una cuenta real.
-
----
-
-## 5. Qué toca AHORA
-
-1. **`git push`** — queda 1 commit local sin subir.
-2. **Entrar con la cuenta de Luis** y revisar los 4 puntos de arriba. Sugerencia:
-   crear una tanda chica en una fecha lejana, ver el recuento, y borrarla con las
-   casillas.
-3. **Probar con un trabajador** — cierra el punto 9 de `TAREAS.md`.
-4. Después: punto 6 ("Soy nuevo", el mini mapa ya está listo para reutilizarse),
-   punto 11 ("¿Olvidaste tu contraseña?", el ojito ya está hecho), punto 10.
-5. Cuando se toque la base: `cancelada_por` (puntos 7 y 13). **Avisar antes.**
+Archivos tocados en esta última pasada: `supabase/schema.sql` (políticas nuevas
+de `citas` + notas sobre `asignado_a` en desuso), `TAREAS.md`,
+`supabase/migraciones/2026-09-25-citas-por-sede.sql` (sellado como aplicada) y
+este `ESTADO.md`. `python build.py` corrió sin colisiones → `index.html` (790 KB).
 
 ---
 
 ## 6. Reglas que no se rompen
 
-1. **`service_role` NUNCA en el frontend.** El repo es público. Lo que necesite
-   privilegios va en una Edge Function. La `anon key` sí va, es su uso previsto.
-2. **No tocar el patrón de `notify-cita`**: responde 200 de inmediato y manda el
-   correo con `EdgeRuntime.waitUntil`. pg_net corta a los 8 s y Gmail tarda ~6 s.
-3. **Los mapas NO llevan API key de Google.** `output=embed` para el iframe y
-   Maps URLs para el botón. **No "mejorarlo" a la API oficial.**
-4. **Fechas con `isoLocal()`, nunca `toISOString().slice(0,10)`.**
+1. **`service_role` NUNCA en el frontend.** La `anon key` sí va.
+2. **No tocar el patrón de `notify-cita`**: 200 inmediato + `EdgeRuntime.waitUntil`.
+3. **Los mapas NO llevan API key de Google.** `output=embed` + Maps URLs.
+4. **Fechas con `isoLocal()`**, nunca `toISOString().slice(0,10)`.
 5. **"Ocupado" se deriva de `horarios_disponibles.disponible`**, nunca de cruzar
    con `citas`.
-6. **Sedes: todo sale de la base** (nombre, dirección, color, mapa).
-7. **No modificar la base de datos** salvo la migración ya aprobada.
+6. **Sedes: todo sale de la base.**
+7. **Migrar solo lo aprobado, avisando antes y dejándolo anotado acá después.**
+   Aprobadas y todavía sin hacer: `citas.cancelada_por` (punto 7) y
+   `citas.dni_cliente` nullable (punto 14).
 8. **Nada de lo que ya funciona puede dejar de funcionar.**
-9. Flujo de publicación: `editar /src` → `python build.py` → `git add -A` →
-   `git commit` → `git push`. El `index.html` de la raíz es **generado**.
-10. **La lista de citas del trabajador no se filtra por sede.**
-11. **El color de la sede nunca se usa como texto sobre blanco.** Para texto va
-    `--sede-texto` (o `colorLegible()`); el color crudo, solo de fondo, borde o
-    punto. Y en el **panel** no se usa color de sede para el calendario: ahí
-    manda la paleta de la marca.
-12. **El alta en lote usa `ignoreDuplicates: true`.** Un upsert normal pisaría
-    horarios existentes y puede provocar doble reserva.
-13. **Un horario con cualquier cita apuntándolo no se puede borrar**, aunque la
-    cita esté cancelada y el horario figure como libre: la FK `citas.horario_id`
-    no tiene `ON DELETE`.
+9. Flujo: `editar /src` → `python build.py` → `git add -A` → `git commit` → `git push`.
+10. **El color de la sede nunca se usa como texto sobre blanco**, y en el panel
+    el calendario va con la paleta de la marca.
+11. **El alta de horarios en lote usa `ignoreDuplicates: true`.**
+12. **Un horario con cualquier cita apuntándolo no se puede borrar**, aunque esté
+    cancelada.
+13. **Los correos de los trabajadores los manda la pestaña Usuarios.** Editarlos
+    a mano en Correos funciona, pero el próximo cambio de sede los reacomoda.
+14. **La sincronización de correos toca solo las filas de ese email.** Nunca
+    barrer `notificaciones_sede` entera.
 
 ---
 
 ## 7. Decisiones que dependen de Christopher
 
-Una sola, y sin apuro:
+**1. El punto 13 de `TAREAS.md` quedó sin piso.** Eran dos correos de
+delegación; al no haber delegación, el (a) —avisar al trabajador anterior en una
+reasignación— ya no existe. El (b) —avisar de una cancelación— sigue teniendo
+sentido, pero el destinatario natural son los correos de la sede, que ya incluyen
+a sus trabajadores: **se funde con el punto 7**. Hay que confirmar cómo lo quieres
+antes de tocarlo.
 
-**¿Hace falta ver los horarios eliminados?** Hoy no se puede: al borrarlos
-desaparece la fila. Si Luis quiere ese historial, la forma sería no borrar de
-verdad sino marcarlos como archivados — eso **sí toca la base** (una columna
-nueva) y hay que decidirlo antes de hacerlo. Mientras tanto, la sección
-"Reservados o deshabilitados" cubre los otros dos casos que pediste: los que
-tienen cita y los deshabilitados a mano.
+**2. ¿Hace falta ver los horarios eliminados?** Hoy no se puede: al borrarlos
+desaparece la fila. Mostrarlos implicaría archivar en vez de borrar, y eso toca
+la base.
+
+**3. `citas.asignado_a` se quedó en la base** como historial. No molesta. Si
+algún día se quiere limpiar, hay que quitar antes el trigger
+`trg_notificar_cita_delegada` (hoy inofensivo: ya nada escribe esa columna, así
+que nunca se dispara).
