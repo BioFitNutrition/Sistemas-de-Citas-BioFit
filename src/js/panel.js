@@ -20,7 +20,30 @@ let altaCal = null;      // calendario de alta de horarios (modo "varios")
 let seleccionHorarios = new Set();   // ids marcados para borrar en lote (admin)
 let diasAbiertos = new Set();        // "seccion|fecha" de los días desplegados
 let citasALaVista = "activas";       // "activas" | "historial": sub-sección de Citas
+let horariosALaVista = "libres";     // "libres" | "reservados" | "inhabilitados"
 let tocoLosDias = false;             // true cuando el usuario abrió o cerró alguno
+
+// Bloque propio del trabajador: qué sedes tiene, y una guía corta de cómo
+// funciona su panel. Al admin no se le muestra: él ve y puede todo, y el propio
+// panel de Usuarios ya le dice quién gestiona qué.
+function pintarGuiaTrabajador(mias) {
+  const bloque = document.getElementById("panel-trabajador");
+  if (!bloque) return;
+
+  bloque.classList.toggle("hidden", !esTrabajador());
+  if (!esTrabajador()) return;
+
+  const sedes = mias || [];
+  const chips = document.getElementById("panel-sedes-chips");
+  chips.innerHTML = "";
+  sedes.forEach((id) => chips.appendChild(chipSede(id)));
+
+  // Sin ninguna sede, el panel sale vacío; sin este aviso parece un error del
+  // sistema y no una ficha a medio llenar.
+  const sinSedes = sedes.length === 0;
+  bloque.querySelector(".guia__sedes").classList.toggle("hidden", sinSedes);
+  document.getElementById("panel-sin-sedes").classList.toggle("hidden", !sinSedes);
+}
 
 // Sedes que el usuario puede gestionar. `null` = todas, y es siempre el caso
 // del admin. El trabajador tiene la lista exacta que le marcaron, que puede
@@ -64,9 +87,7 @@ export async function entrarAlPanel() {
   const cuantas = mias === null ? getSedes().length : mias.length;
   const unaSola = cuantas === 1;
 
-  // Un trabajador sin ninguna sede marcada no ve nada, y sin este aviso el panel
-  // vacío parece un error del sistema en vez de una ficha a medio llenar.
-  document.getElementById("panel-sin-sedes").classList.toggle("hidden", cuantas !== 0);
+  pintarGuiaTrabajador(mias);
 
   // CITAS: ahora SÍ se filtran por sede. Antes no, porque una cita delegada podía
   // ser de cualquier sede y el filtro se la escondía (el bug del punto 1 de
@@ -150,7 +171,7 @@ export async function cargarCitas() {
 
   if (!data || data.length === 0) {
     listEl.innerHTML = esTrabajador()
-      ? '<p class="empty-state">Todavía no hay citas en tu sede.</p>'
+      ? '<p class="empty-state">Todavía no hay citas en tus sedes.</p>'
       : '<p class="empty-state">No hay citas registradas.</p>';
     return;
   }
@@ -187,19 +208,25 @@ export async function cargarCitas() {
   ];
 
   listEl.innerHTML = "";
-  listEl.appendChild(renderSelectorCitas([
-    { clave: "activas", texto: "Próximas", cuantas: activas.length },
-    { clave: "historial", texto: "Pasadas o canceladas", cuantas: historial.length },
-  ]));
-  secciones.forEach((sec) => {
-    sec.classList.toggle("hidden", !sec.classList.contains("grupo--" + citasALaVista));
-    listEl.appendChild(sec);
-  });
+  listEl.appendChild(renderSubtabs({
+    activa: citasALaVista,
+    opciones: [
+      { clave: "activas", texto: "Próximas", cuantas: activas.length },
+      { clave: "historial", texto: "Pasadas o canceladas", cuantas: historial.length },
+    ],
+    alElegir: (clave) => {
+      citasALaVista = clave;
+      mostrarSeccion(listEl, clave);
+    },
+  }));
+  secciones.forEach((sec) => listEl.appendChild(sec));
+  mostrarSeccion(listEl, citasALaVista);
 }
 
-// Cambia entre "Próximas" e historial sin volver a consultar la base: las dos
-// listas ya están en pantalla, solo se oculta una.
-function renderSelectorCitas(opciones) {
+// Barra de sub-pestañas, compartida por Citas y Horarios. Todas las secciones
+// están en el DOM y esto solo elige cuál se ve: cambiar de pestaña no vuelve a
+// consultar la base.
+function renderSubtabs({ opciones, activa, alElegir }) {
   const barra = document.createElement("div");
   barra.className = "subtabs";
   barra.setAttribute("role", "tablist");
@@ -207,9 +234,9 @@ function renderSelectorCitas(opciones) {
   opciones.forEach(({ clave, texto, cuantas }) => {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "subtab" + (clave === citasALaVista ? " active" : "");
+    btn.className = "subtab" + (clave === activa ? " active" : "");
     btn.setAttribute("role", "tab");
-    btn.setAttribute("aria-selected", String(clave === citasALaVista));
+    btn.setAttribute("aria-selected", String(clave === activa));
 
     const et = document.createElement("span");
     et.textContent = texto;
@@ -221,23 +248,26 @@ function renderSelectorCitas(opciones) {
     btn.appendChild(n);
 
     btn.addEventListener("click", () => {
-      if (citasALaVista === clave) return;
-      citasALaVista = clave;
-      const lista = document.getElementById("citas-list");
-      lista.querySelectorAll(".subtab").forEach((b) => {
+      if (btn.classList.contains("active")) return;
+      barra.querySelectorAll(".subtab").forEach((b) => {
         const suya = b === btn;
         b.classList.toggle("active", suya);
         b.setAttribute("aria-selected", String(suya));
       });
-      lista.querySelectorAll(".grupo").forEach((sec) => {
-        sec.classList.toggle("hidden", !sec.classList.contains("grupo--" + clave));
-      });
+      alElegir(clave);
     });
 
     barra.appendChild(btn);
   });
 
   return barra;
+}
+
+// Deja visible solo la sección `clave` dentro de esa lista.
+function mostrarSeccion(lista, clave) {
+  lista.querySelectorAll(".grupo").forEach((sec) => {
+    sec.classList.toggle("hidden", !sec.classList.contains("grupo--" + clave));
+  });
 }
 
 // Sin título ni contador propios: los pone la sub-pestaña de arriba, y
@@ -620,9 +650,10 @@ function initBorradoEnLote() {
   if (!todos || !btn) return;
 
   todos.addEventListener("change", () => {
-    // "Todos los visibles" son los que la lista muestra ahora, que ya respetan
-    // el filtro de sede activo. Los bloqueados por una cita no se tocan.
-    document.querySelectorAll("#horarios-list .chk-horario:not(:disabled)").forEach((chk) => {
+    // ⚠️ "Todos los visibles" es literal: solo la sub-pestaña abierta. Sin el
+    // `.grupo:not(.hidden)` también marcaría los de las secciones ocultas, y una
+    // pulsada a Eliminar borraría horarios que el usuario nunca vio.
+    document.querySelectorAll("#horarios-list .grupo:not(.hidden) .chk-horario:not(:disabled)").forEach((chk) => {
       chk.checked = todos.checked;
       if (todos.checked) seleccionHorarios.add(chk.dataset.id);
       else seleccionHorarios.delete(chk.dataset.id);
@@ -642,12 +673,12 @@ function actualizarBarraLote() {
   btn.disabled = n === 0;
   btn.textContent = n === 0 ? "Eliminar" : "Eliminar " + plural(n, "horario", "horarios");
 
-  // La casilla de arriba refleja el estado real de la lista.
-  const libres = document.querySelectorAll("#horarios-list .chk-horario:not(:disabled)").length;
+  // La casilla de arriba refleja el estado real de la sección a la vista.
+  const libres = document.querySelectorAll("#horarios-list .grupo:not(.hidden) .chk-horario:not(:disabled)").length;
   if (todos) todos.checked = libres > 0 && n === libres;
 
   // Y cada día muestra si está entero, a medias o sin marcar.
-  document.querySelectorAll("#horarios-list .dia").forEach((det) => {
+  document.querySelectorAll("#horarios-list .grupo:not(.hidden) .dia").forEach((det) => {
     const chkDia = det.querySelector(".chk-dia");
     if (!chkDia) return;
     const casillas = [...det.querySelectorAll(".chk-horario:not(:disabled)")];
@@ -733,19 +764,23 @@ export async function cargarHorarios() {
     return;
   }
 
-  // IMPORTANTE: el estado "ocupado" se deriva de `disponible`, NO de cruzar con `citas`.
-  // Con RLS, un trabajador solo recibe SUS citas: si cruzáramos, los horarios tomados
-  // por citas de otros le aparecerían libres y podría generarse una doble reserva.
-  // Solo el admin (que ve todas las citas) puede distinguir "ocupado" de "deshabilitado".
+  // ⚠⚠ REGLA QUE NO SE ROMPE: "ocupado" se deriva de `disponible`, NUNCA de
+  // cruzar con `citas`. Lo de abajo NO decide si un horario está tomado — eso ya
+  // lo dice `h.disponible`. Solo sirve para dos cosas secundarias:
+  //   1. saber POR QUÉ no está disponible (cita confirmada vs deshabilitado a mano)
+  //   2. saber cuáles no se pueden borrar: `citas.horario_id` es una FK sin ON
+  //      DELETE, así que Postgres rechaza el borrado mientras la cita exista,
+  //      INCLUSO si está cancelada (y una cancelada devuelve el horario a "Libre":
+  //      ese es el caso traicionero).
   //
-  // El admin necesita además saber qué horarios tiene ALGUNA cita apuntándolos,
-  // incluso cancelada: `citas.horario_id` es una FK sin ON DELETE, así que
-  // Postgres rechaza borrar el horario mientras esa fila exista. Ojo con el caso
-  // traicionero: una cita cancelada libera el horario (vuelve a "Libre") pero
-  // sigue bloqueando el borrado.
+  // Desde el 25/09/2026 también lo hace el trabajador. Antes no podía: solo veía
+  // las citas que le delegaban. Hoy ve las de sus sedes, y los horarios de esta
+  // lista ya vienen recortados a esas mismas sedes, así que la foto le cuadra.
+  // Y si alguna cita se le escapara, el horario cae en "Inhabilitados" en vez de
+  // "Reservados": una etiqueta peor, nunca un horario que parezca libre sin serlo.
   let ocupados = new Set();
   let conCita = new Map();
-  if (esAdmin()) {
+  {
     const { data: citas } = await supabase.from("citas").select("horario_id, estado");
     (citas || []).forEach((c) => {
       if (c.estado === "confirmada") {
@@ -760,29 +795,56 @@ export async function cargarHorarios() {
   // La selección no sobrevive a un recargado: los ids de la lista cambiaron.
   seleccionHorarios.clear();
 
-  // Dos secciones en la misma pestaña: lo que sigue disponible, y lo que ya no
-  // lo está (reservado o deshabilitado a mano). Antes iba todo mezclado y no se
-  // distinguía de un vistazo qué quedaba realmente libre.
+  // Tres sub-pestañas, y solo se ve una. "Reservado" e "inhabilitado" estaban
+  // juntos y son cosas distintas: uno lo tomó un socio, al otro lo apagaste tú.
   const libres = horarios.filter((h) => h.disponible);
-  const tomados = horarios.filter((h) => !h.disponible);
+  const reservados = horarios.filter((h) => !h.disponible && ocupados.has(h.id));
+  const inhabilitados = horarios.filter((h) => !h.disponible && !ocupados.has(h.id));
 
   listEl.innerHTML = "";
+  listEl.appendChild(renderSubtabs({
+    activa: horariosALaVista,
+    opciones: [
+      { clave: "libres", texto: "Libres", cuantas: libres.length },
+      { clave: "reservados", texto: "Reservados", cuantas: reservados.length },
+      { clave: "inhabilitados", texto: "Inhabilitados", cuantas: inhabilitados.length },
+    ],
+    alElegir: (clave) => {
+      horariosALaVista = clave;
+      mostrarSeccion(listEl, clave);
+      // La selección NO cruza de sub-pestaña: si se quedara marcada, "eliminar"
+      // borraría horarios que ya no están a la vista.
+      seleccionHorarios.clear();
+      listEl.querySelectorAll(".chk-horario").forEach((c) => { c.checked = false; });
+      const todos = document.getElementById("chk-todos-horarios");
+      if (todos) todos.checked = false;
+      actualizarBarraLote();
+    },
+  }));
+
   listEl.appendChild(renderSeccionHorarios({
     clave: "libres",
-    titulo: "Libres",
     ayuda: "Creados y todavía disponibles para reservar.",
     horarios: libres,
     vacio: "No queda ningún horario libre. Crea más con el calendario de arriba.",
     ocupados, conCita,
   }));
   listEl.appendChild(renderSeccionHorarios({
-    clave: "tomados",
-    titulo: "Reservados o deshabilitados",
-    ayuda: "Ya no se pueden reservar: o tienen una cita, o los deshabilitaste a mano.",
-    horarios: tomados,
-    vacio: "Ninguno por ahora.",
+    clave: "reservados",
+    ayuda: "Un socio ya los tomó. No se pueden borrar mientras la cita exista.",
+    horarios: reservados,
+    vacio: "Ninguno reservado por ahora.",
     ocupados, conCita,
   }));
+  listEl.appendChild(renderSeccionHorarios({
+    clave: "inhabilitados",
+    ayuda: "Apagados a mano: nadie puede reservarlos, pero no tienen cita.",
+    horarios: inhabilitados,
+    vacio: "Ninguno inhabilitado.",
+    ocupados, conCita,
+  }));
+
+  mostrarSeccion(listEl, horariosALaVista);
 
   // La barra de borrado solo tiene sentido si el admin tiene algo que borrar.
   const barra = document.getElementById("lote-bar");
@@ -804,24 +866,10 @@ function apagarBarraLote() {
 }
 
 // Una sección ("Libres" / "Reservados o deshabilitados") con sus días adentro.
-function renderSeccionHorarios({ clave, titulo, ayuda, horarios, vacio, ocupados, conCita }) {
+// Sin título ni contador propios: los pone la sub-pestaña de arriba.
+function renderSeccionHorarios({ clave, ayuda, horarios, vacio, ocupados, conCita }) {
   const seccion = document.createElement("section");
   seccion.className = "grupo grupo--" + clave;
-
-  const cab = document.createElement("div");
-  cab.className = "grupo__head";
-
-  const h = document.createElement("h3");
-  h.className = "grupo__titulo";
-  h.textContent = titulo;
-  cab.appendChild(h);
-
-  const cuenta = document.createElement("span");
-  cuenta.className = "grupo__cuenta";
-  cuenta.textContent = String(horarios.length);
-  cab.appendChild(cuenta);
-
-  seccion.appendChild(cab);
 
   const nota = document.createElement("p");
   nota.className = "grupo__ayuda";
@@ -1001,7 +1049,7 @@ function renderHorario(horario, ocupados, conCita) {
   acciones.appendChild(badge);
 
   // Solo se puede habilitar/deshabilitar un horario sin cita activa.
-  // El trabajador únicamente puede tocar horarios libres de su sede.
+  // El trabajador únicamente puede tocar horarios libres de sus sedes.
   const puedeAlternar = esAdmin() ? !tieneCita : horario.disponible;
 
   if (puedeAlternar) {

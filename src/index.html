@@ -296,15 +296,47 @@
           <span id="panel-usuario"></span>
           <span id="panel-rol" class="badge"></span>
         </p>
-        <p id="panel-sin-sedes" class="panel-sin-sedes hidden">
-          Todavía no tienes ninguna sede asignada, por eso no ves citas ni horarios.
-          Pedíselo al administrador.
-        </p>
       </div>
       <button id="btn-logout" class="btn-pill btn-pill--salir">
         <svg class="btn-pill__ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 17l5-5-5-5M20 12H9M11 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5"/></svg>
         <span>Cerrar sesión</span>
       </button>
+    </div>
+
+    <!-- Solo para el trabajador: qué sedes tiene y cómo funciona su panel -->
+    <div id="panel-trabajador" class="guia hidden">
+      <p class="guia__sedes">
+        <span class="guia__etiqueta">Tus sedes asignadas son:</span>
+        <span id="panel-sedes-chips" class="guia__chips"></span>
+      </p>
+
+      <p id="panel-sin-sedes" class="panel-sin-sedes hidden">
+        Todavía no tienes ninguna sede asignada, por eso no ves citas ni horarios.
+        Pídesela al administrador.
+      </p>
+
+      <details class="guia__detalle">
+        <summary class="guia__sum">Lo que conviene que sepas de tu panel</summary>
+        <ul class="guia__lista">
+          <li><strong>Solo ves lo de tus sedes.</strong> Las citas y los horarios de
+            las otras no te llegan, ni aunque cambies el filtro. Si te falta una
+            sede, pídesela al administrador: es el único que las asigna.</li>
+          <li><strong>Puedes crear y deshabilitar horarios, pero no borrarlos.</strong>
+            Borrar es solo del administrador. Si te equivocaste al crear uno,
+            deshabilítalo: deja de aparecerle al socio igual.</li>
+          <li><strong>"Reservado" e "inhabilitado" no son lo mismo.</strong>
+            Reservado es un horario que ya tomó un socio. Inhabilitado es uno que
+            apagaste tú.</li>
+          <li><strong>Cancelar una cita libera su horario solo.</strong> Vuelve a
+            quedar disponible sin que tengas que hacer nada más.</li>
+          <li><strong>La lista de citas se actualiza sola.</strong> Si entra una
+            reserva mientras la tienes abierta, aparece sin recargar la página.</li>
+          <li><strong>Los correos de aviso que recibes son los de tus sedes.</strong>
+            Se reacomodan solos cuando el administrador te cambia las sedes.</li>
+          <li><strong>Cada cita dura 20 minutos</strong> y los horarios se encadenan
+            uno tras otro dentro de la franja que elijas.</li>
+        </ul>
+      </details>
     </div>
 
     <div class="tabs">

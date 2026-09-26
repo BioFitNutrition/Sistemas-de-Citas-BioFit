@@ -32,7 +32,7 @@ body {
   margin: 0;
   font-family: var(--font);
   background:
-    linear-gradient(rgba(247, 248, 247, 0.90), rgba(247, 248, 247, 0.90)),
+    linear-gradient(rgba(247, 248, 247, 0.82), rgba(247, 248, 247, 0.82)),
     url("assets/portada-biofit.jpg") center / cover no-repeat;
   background-color: var(--color-bg);
   color: var(--color-text);
@@ -1485,9 +1485,65 @@ body {
 .editor-card__email { margin: 0 0 18px; font-size: 0.88rem; color: var(--color-text-muted); }
 .editor-card__acciones { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 
+/* ---- Bloque del trabajador: sus sedes + guía corta ---- */
+.guia {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px 16px;
+  margin: 0 0 18px;
+}
+.guia__sedes {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 0;
+}
+.guia__etiqueta { font-weight: 700; font-size: 0.92rem; }
+.guia__chips { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+
+.guia__detalle { margin-top: 10px; }
+.guia__sum {
+  cursor: pointer;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-primary-dark);
+  padding: 4px 0;
+}
+.guia__sum::-webkit-details-marker { display: none; }
+.guia__sum::before {
+  content: "";
+  width: 0;
+  height: 0;
+  border-left: 5px solid currentColor;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  transition: transform 0.15s ease;
+}
+.guia__detalle[open] .guia__sum::before { transform: rotate(90deg); }
+.guia__sum:hover { text-decoration: underline; }
+
+.guia__lista {
+  margin: 8px 0 2px;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+.guia__lista strong { color: var(--color-text); }
+
 /* Un trabajador sin sedes ve el panel vacío; sin esto parece que se rompió. */
 .panel-sin-sedes {
-  margin: 10px 0 0;
+  margin: 0;
   padding: 10px 14px;
   border-radius: 10px;
   background: #fff8e6;
@@ -1495,7 +1551,6 @@ body {
   color: #7a5b00;
   font-size: 0.85rem;
   line-height: 1.45;
-  max-width: 560px;
 }
 
 /* Correo que no se administra a mano, sino desde la ficha del trabajador. */
