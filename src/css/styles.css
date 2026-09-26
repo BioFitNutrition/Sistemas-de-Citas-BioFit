@@ -58,13 +58,15 @@ body::before {
     url("assets/portada-biofit.jpg");
   background-position: center, center;
   background-repeat: no-repeat, no-repeat;
-  /* ⚠️ `contain`, NO `cover`. La foto es del consultorio entero y se quiere ver
-     entero: `cover` recorta para llenar, y en un celular vertical (ratio 0.46
-     contra el 1.50 de la foto) se comía casi todo el ambiente, dejando solo una
-     franja del escritorio. Con `contain` la foto entra completa en cualquier
-     pantalla; lo que sobra a los lados o arriba lo cubre --color-bg, que es el
-     mismo tono del velo y no se nota como borde. */
-  background-size: auto, contain;
+  /* `cover`: la foto llena la pantalla entera, sin franjas.
+     Se probó `contain` para que se viera el consultorio completo y quedaba la
+     foto encajonada en el medio con dos bandas blancas a los lados — se leía
+     como un error, no como un fondo. Con `cover` recorta un poco (en 16:9 se
+     va algo de techo y de piso), pero el escritorio, las sillas y la balanza,
+     que es lo que da el ambiente, quedan siempre.
+     La imagen se sube a 1920 de ancho justamente para esto: al llenar una
+     pantalla de 1080p el navegador no tiene que estirar nada. */
+  background-size: auto, cover;
 }
 
 /* ⚠️ NO volver a ponerle `filter: blur()` al fondo. Se probó (2px en pantallas
