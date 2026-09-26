@@ -1,48 +1,35 @@
-// ============================================
 // Edge Function: notify-cita
-// ============================================
 // Envía los correos del sistema usando el Gmail de BioFit vía SMTP.
-// No se usa Resend porque BioFit no tiene dominio propio, y sin dominio
-// verificado Resend solo permite enviar a la dirección de la propia cuenta.
 //
-// Son TRES tipos de correo:
-//   1. Cita nueva  -> aviso interno a los correos de `notificaciones_sede`
-//   2. Cita nueva  -> confirmación al socio
-//   3. Cita delegada -> aviso al trabajador asignado
+// Tres tipos de correo:
+//   1. Cita nueva    -> aviso interno a los correos de `notificaciones_sede`
+//   2. Cita nueva    -> confirmación al socio
+//   3. Cita delegada -> aviso al trabajador asignado (EN DESUSO: la delegación
+//      se eliminó el 25/09/2026 y su trigger ya no se dispara)
 //
-// Se dispara con Database Webhooks:
-//   - INSERT en `citas`  -> correos 1 y 2
-//   - UPDATE en `citas`  -> correo 3 (cuando cambia `asignado_a`)
+// IMPORTANTE: responde 200 de inmediato y manda el correo en SEGUNDO PLANO
+// (EdgeRuntime.waitUntil). Conectarse a Gmail por SMTP puede tardar varios
+// segundos, y quien nos llama (pg_net) corta la espera. Si respondiéramos al
+// final, el corte mataría la ejecución antes de enviar nada.
 //
-// Desplegar:
-//   supabase functions deploy notify-cita --no-verify-jwt
+// Secretos: GMAIL_USER, GMAIL_APP_PASSWORD, WEBHOOK_SECRET
 //
-// Secretos:
-//   supabase secrets set GMAIL_USER=biofit.consulting1@gmail.com
-//   supabase secrets set GMAIL_APP_PASSWORD=xxxxxxxxxxxxxxxx
-//   supabase secrets set WEBHOOK_SECRET=algo-largo-y-aleatorio
-//
-// La contraseña de aplicación se genera en la cuenta de Google con la
-// verificación en 2 pasos activada. NO es la contraseña normal del Gmail.
+// ⚠️ Se despliega con verify_jwt = false: la llama un Database Webhook, que no
+// manda JWT. La autenticación es el header `x-webhook-secret`.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { SMTPClient } from "jsr:@denodrivers/smtp";
+import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const GMAIL_USER = Deno.env.get("GMAIL_USER")!;
-const GMAIL_APP_PASSWORD = Deno.env.get("GMAIL_APP_PASSWORD")!;
+const GMAIL_USER = Deno.env.get("GMAIL_USER") ?? "";
+const GMAIL_APP_PASSWORD = Deno.env.get("GMAIL_APP_PASSWORD") ?? "";
 const WEBHOOK_SECRET = Deno.env.get("WEBHOOK_SECRET");
 
 const db = createClient(SUPABASE_URL, SERVICE_ROLE);
 
-// ---------- utilidades ----------
-
 function esc(v: unknown): string {
-  return String(v ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  return String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 function formatearFecha(iso: string): string {
@@ -79,13 +66,33 @@ function plantilla(titulo: string, cuerpo: string): string {
 }
 
 function filaDato(etiqueta: string, valor: string): string {
-  return `<p style="margin:0 0 8px;font-size:14px;color:#171a1c">
-    <strong style="color:#6b7280;font-weight:600">${etiqueta}:</strong> ${valor}
-  </p>`;
+  return `<p style="margin:0 0 8px;font-size:14px;color:#171a1c"><strong style="color:#6b7280;font-weight:600">${etiqueta}:</strong> ${valor}</p>`;
+}
+
+// ⚠️ NO QUITAR: esto es lo que arregla los "=20" que salían dentro del correo.
+//
+// El HTML de arriba viene indentado, así que varias líneas terminan en espacios
+// (la del `${cuerpo}`, por ejemplo, queda con los 6 espacios del sangrado). Al
+// codificar en quoted-printable, un espacio al final de línea OBLIGATORIAMENTE
+// se escribe como "=20", y a Gmail en el celular le llegaba sin decodificar:
+// aparecía un "=20" suelto arriba y otro abajo del mensaje.
+//
+// Se arregla en el origen: se deja el HTML en una sola línea, sin sangrado ni
+// saltos. Así no hay espacio final que codificar, sea cual sea el encoder.
+// Se une con un espacio (no vacío) para no pegar palabras si algún día un texto
+// queda partido en dos líneas.
+function compactar(html: string): string {
+  return html.replace(/[ \t]*\r?\n[ \t]*/g, " ").trim();
 }
 
 async function enviarCorreo(destinatarios: string[], asunto: string, html: string) {
   if (destinatarios.length === 0) return;
+  if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
+    console.error("FALTAN SECRETOS: GMAIL_USER o GMAIL_APP_PASSWORD no están configurados");
+    return;
+  }
+
+  console.log(`Conectando a Gmail para enviar a: ${destinatarios.join(", ")}`);
 
   const client = new SMTPClient({
     connection: {
@@ -96,6 +103,8 @@ async function enviarCorreo(destinatarios: string[], asunto: string, html: strin
     },
   });
 
+  const cuerpo = compactar(html);
+
   try {
     for (const to of destinatarios) {
       await client.send({
@@ -103,31 +112,27 @@ async function enviarCorreo(destinatarios: string[], asunto: string, html: strin
         to,
         subject: asunto,
         content: "auto",
-        html,
+        html: cuerpo,
       });
+      console.log(`Correo enviado a ${to}`);
     }
+  } catch (err) {
+    console.error("Fallo al enviar por SMTP:", err instanceof Error ? err.message : String(err));
+    throw err;
   } finally {
-    await client.close();
+    try { await client.close(); } catch { /* ignorar */ }
   }
 }
 
-// ---------- lógica de negocio ----------
-
 async function datosSede(sedeId: string) {
-  const { data } = await db
-    .from("sedes")
-    .select("nombre, direccion")
-    .eq("id", sedeId)
-    .maybeSingle();
+  const { data } = await db.from("sedes").select("nombre, direccion").eq("id", sedeId).maybeSingle();
   return { nombre: data?.nombre ?? sedeId, direccion: data?.direccion ?? "" };
 }
 
-// 1 y 2: cita nueva
 async function citaNueva(cita: Record<string, any>) {
   const sede = await datosSede(cita.sede_id);
   const cuando = `${formatearFecha(cita.fecha)} · ${formatearHora(cita.hora)}`;
 
-  // --- Aviso interno ---
   const { data: correos } = await db
     .from("notificaciones_sede")
     .select("email")
@@ -135,44 +140,32 @@ async function citaNueva(cita: Record<string, any>) {
     .eq("activo", true);
 
   const destinatarios = (correos ?? []).map((c: { email: string }) => c.email);
+  console.log(`Cita nueva en ${sede.nombre}. Avisos internos: ${destinatarios.length}`);
 
   if (destinatarios.length > 0) {
     const html = plantilla("Nueva cita reservada", `
       ${filaDato("Socio", esc(cita.nombre_cliente))}
+      ${cita.dni_cliente ? filaDato("DNI", esc(cita.dni_cliente)) : ""}
       ${filaDato("Sede", esc(sede.nombre))}
       ${filaDato("Cuándo", esc(cuando))}
       ${filaDato("Teléfono", esc(cita.telefono_cliente))}
       ${filaDato("Correo", esc(cita.email_cliente ?? "—"))}
     `);
-    await enviarCorreo(
-      destinatarios,
-      `Nueva cita: ${cita.nombre_cliente} — ${sede.nombre}`,
-      html,
-    );
+    await enviarCorreo(destinatarios, `Nueva cita: ${cita.nombre_cliente} — ${sede.nombre}`, html);
   }
 
-  // --- Confirmación al socio ---
   if (cita.email_cliente) {
     const html = plantilla("¡Tu cita está confirmada!", `
-      <p style="margin:0 0 16px;font-size:14px;color:#171a1c">
-        Hola ${esc(cita.nombre_cliente)}, reservamos tu asesoría nutricional de 20 minutos.
-      </p>
+      <p style="margin:0 0 16px;font-size:14px;color:#171a1c">Hola ${esc(cita.nombre_cliente)}, reservamos tu asesoría nutricional de 20 minutos.</p>
       ${filaDato("Cuándo", esc(cuando))}
       ${filaDato("Dónde", esc(sede.nombre))}
       ${sede.direccion ? filaDato("Dirección", esc(sede.direccion)) : ""}
-      <p style="margin:16px 0 0;font-size:13px;color:#6b7280">
-        Si necesitas reprogramar o cancelar, contáctanos directamente. ¡Te esperamos!
-      </p>
+      <p style="margin:16px 0 0;font-size:13px;color:#6b7280">Si necesitas reprogramar o cancelar, contáctanos directamente. ¡Te esperamos!</p>
     `);
-    await enviarCorreo(
-      [cita.email_cliente],
-      `Tu cita en BioFit — ${cuando}`,
-      html,
-    );
+    await enviarCorreo([cita.email_cliente], `Tu cita en BioFit — ${cuando}`, html);
   }
 }
 
-// 3: cita delegada a un trabajador
 async function citaDelegada(cita: Record<string, any>) {
   const { data: trabajador } = await db
     .from("perfiles")
@@ -180,41 +173,49 @@ async function citaDelegada(cita: Record<string, any>) {
     .eq("id", cita.asignado_a)
     .maybeSingle();
 
-  if (!trabajador?.email || trabajador.activo !== true) return;
+  if (!trabajador?.email || trabajador.activo !== true) {
+    console.log("El trabajador asignado no existe o está inactivo; no se envía aviso.");
+    return;
+  }
 
   const sede = await datosSede(cita.sede_id);
   const cuando = `${formatearFecha(cita.fecha)} · ${formatearHora(cita.hora)}`;
 
   const html = plantilla("Te asignaron una cita", `
-    <p style="margin:0 0 16px;font-size:14px;color:#171a1c">
-      Hola ${esc(trabajador.nombre ?? "")}, te delegaron esta asesoría:
-    </p>
+    <p style="margin:0 0 16px;font-size:14px;color:#171a1c">Hola ${esc(trabajador.nombre ?? "")}, te delegaron esta asesoría:</p>
     ${filaDato("Socio", esc(cita.nombre_cliente))}
     ${filaDato("Cuándo", esc(cuando))}
     ${filaDato("Sede", esc(sede.nombre))}
     ${sede.direccion ? filaDato("Dirección", esc(sede.direccion)) : ""}
     ${filaDato("Teléfono", esc(cita.telefono_cliente))}
-    <p style="margin:16px 0 0;font-size:13px;color:#6b7280">
-      Ya puedes verla en tu panel de BioFit.
-    </p>
+    <p style="margin:16px 0 0;font-size:13px;color:#6b7280">Ya puedes verla en tu panel de BioFit.</p>
   `);
 
-  await enviarCorreo(
-    [trabajador.email],
-    `Nueva cita asignada: ${cita.nombre_cliente} — ${cuando}`,
-    html,
-  );
+  await enviarCorreo([trabajador.email], `Nueva cita asignada: ${cita.nombre_cliente} — ${cuando}`, html);
 }
 
-// ---------- entrada ----------
+// Todo el trabajo pesado vive aquí y corre en segundo plano.
+async function procesar(tipo: string, registro: Record<string, any>, anterior: Record<string, any> | undefined) {
+  try {
+    if (tipo === "INSERT") {
+      await citaNueva(registro);
+    } else if (tipo === "UPDATE") {
+      const cambioAsignacion = registro.asignado_a && registro.asignado_a !== anterior?.asignado_a;
+      if (cambioAsignacion && registro.estado !== "cancelada") {
+        await citaDelegada(registro);
+      }
+    }
+    console.log("Procesamiento terminado correctamente.");
+  } catch (err) {
+    console.error("Error procesando la notificación:", err instanceof Error ? err.message : String(err));
+  }
+}
 
 Deno.serve(async (req) => {
-  if (req.method !== "POST") {
-    return new Response("Método no permitido", { status: 405 });
-  }
+  if (req.method !== "POST") return new Response("Método no permitido", { status: 405 });
 
-  // Valida el secreto compartido configurado en el header del webhook
   if (WEBHOOK_SECRET && req.headers.get("x-webhook-secret") !== WEBHOOK_SECRET) {
+    console.error("Secreto del webhook incorrecto");
     return new Response("No autorizado", { status: 401 });
   }
 
@@ -225,25 +226,19 @@ Deno.serve(async (req) => {
     return new Response("JSON inválido", { status: 400 });
   }
 
-  const tipo = payload?.type;              // INSERT | UPDATE
+  const tipo = String(payload?.type ?? "");
   const registro = payload?.record;
   const anterior = payload?.old_record;
 
   if (!registro) return new Response("Sin registro en el payload", { status: 400 });
 
-  try {
-    if (tipo === "INSERT") {
-      await citaNueva(registro);
-    } else if (tipo === "UPDATE") {
-      // Solo avisamos si la cita pasó a estar asignada a alguien distinto.
-      const cambioAsignacion = registro.asignado_a && registro.asignado_a !== anterior?.asignado_a;
-      if (cambioAsignacion && registro.estado !== "cancelada") {
-        await citaDelegada(registro);
-      }
-    }
-  } catch (err) {
-    console.error("Error enviando correo:", err);
-    return new Response("Error al enviar el correo", { status: 500 });
+  // Respondemos YA; el correo se manda en segundo plano.
+  // @ts-ignore EdgeRuntime lo provee el entorno de Supabase
+  if (typeof EdgeRuntime !== "undefined" && EdgeRuntime.waitUntil) {
+    // @ts-ignore
+    EdgeRuntime.waitUntil(procesar(tipo, registro, anterior));
+  } else {
+    await procesar(tipo, registro, anterior);
   }
 
   return new Response("OK", { status: 200 });

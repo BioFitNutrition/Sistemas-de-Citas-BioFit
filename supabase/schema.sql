@@ -103,6 +103,10 @@ create table citas (
   nombre_cliente   text not null,
   telefono_cliente text not null,
   email_cliente    text,
+  -- 8 digitos. NULLABLE a proposito: las 31 citas anteriores al 25/09/2026 no
+  -- tienen DNI, y una columna NOT NULL rompia la migracion. La obligatoriedad
+  -- se exige en el formulario del socio, no en la tabla.
+  dni_cliente      text,
   fecha            date not null,
   hora             time not null,
   estado           text not null default 'confirmada',  -- 'confirmada' | 'cancelada'
@@ -418,3 +422,26 @@ alter publication supabase_realtime add table citas;
 --   punto 15 → token de cancelación para el socio
 --   punto 16 → citas.evento_calendar_id (Google Calendar)
 --   punto 17 → marcas de recordatorio enviado (pg_cron)
+
+
+-- ============================================================
+-- 6. REALTIME
+-- ============================================================
+-- Realtime SOLO emite lo que esta en esta publicacion. Suscribirse desde el
+-- frontend a una tabla que no este aqui no da error: simplemente nunca llega
+-- nada, y es dificil de notar.
+--
+--   citas                -> el panel se actualiza al entrar una reserva
+--   horarios_disponibles -> refleja altas y bajas hechas por otro usuario
+--   sedes                -> una sede nueva aparece sin recargar, en el panel y
+--                           en la web del socio
+--   perfil_sedes         -> si el admin le cambia las sedes a un trabajador que
+--                           esta con el panel abierto, su pantalla se reacomoda
+--
+-- Respeta RLS: el trabajador sigue recibiendo solo sus filas, y `citas` sigue
+-- cerrada para el anonimo.
+--
+--   alter publication supabase_realtime add table citas;
+--   alter publication supabase_realtime add table horarios_disponibles;
+--   alter publication supabase_realtime add table sedes;
+--   alter publication supabase_realtime add table perfil_sedes;

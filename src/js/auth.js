@@ -30,6 +30,15 @@ export function misSedes() {
   return _misSedes;
 }
 
+// Vuelve a leer las sedes del usuario con sesión abierta. La usa el realtime:
+// si el admin le cambia las sedes mientras está dentro, su panel se reacomoda
+// sin que tenga que cerrar sesión.
+export async function recargarMisSedes() {
+  if (!_perfil) return null;
+  _misSedes = _perfil.rol === "admin" ? null : await leerMisSedes(_perfil.id);
+  return _misSedes;
+}
+
 // Lee el perfil del usuario autenticado.
 // Las políticas RLS permiten que cada usuario vea su propia fila de `perfiles`.
 export async function cargarPerfil() {

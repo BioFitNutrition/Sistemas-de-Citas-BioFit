@@ -123,7 +123,7 @@ Restricción única: `(sede_id, fecha, hora)`
 
 ### `citas`
 `id` uuid PK · `horario_id` → horarios_disponibles · `sede_id` → sedes ·
-`nombre_cliente` · `telefono_cliente` · `email_cliente` ·
+`nombre_cliente` · `telefono_cliente` · `email_cliente` · `dni_cliente` ·
 `fecha` · `hora` · `estado` (`confirmada` \| `cancelada`) · `created_at` ·
 `asignado_a` uuid → perfiles (nullable) — **en desuso**. Era la delegación cita
 por cita, que se eliminó el 25/09/2026. La columna se deja como historial de lo
@@ -291,6 +291,16 @@ BioFit. Cualquier cambio tiene que respetar lo que ya anda:
   confirmación al socio, y aviso al trabajador cuando se le delega una cita
 - Frontend modular publicado en GitHub Pages
 - Existen 2 trabajadores de prueba en `perfiles`
+
+⚠️ **El HTML de los correos se manda en UNA sola línea** (`compactar()` en
+`notify-cita`). Con el HTML indentado, varias líneas terminaban en espacios, y
+quoted-printable obliga a escribirlos como `=20`: a Gmail en el celular le
+llegaban sin decodificar y salía un `=20` suelto dentro del mensaje. No volver a
+mandar el HTML con sangrado.
+
+⚠️ **Realtime solo emite lo que está en la publicación `supabase_realtime`.**
+Hoy: `citas`, `horarios_disponibles`, `sedes`, `perfil_sedes`. Suscribirse a una
+tabla que no esté ahí **no da error**: simplemente nunca llega nada.
 
 ⚠️ **`notify-cita` responde 200 de inmediato y manda el correo en segundo plano
 con `EdgeRuntime.waitUntil`. NO cambiar ese patrón.** Conectarse a Gmail tarda

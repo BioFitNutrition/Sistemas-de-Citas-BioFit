@@ -6,13 +6,13 @@
 // la lógica, y RLS respalda todo desde la base.
 
 import { supabase } from "./supabaseClient.js";
-import { getPerfil, esAdmin, esTrabajador, misSedes } from "./auth.js";
+import { getPerfil, esAdmin, esTrabajador, misSedes, recargarMisSedes } from "./auth.js";
 import {
   showView, showToast, formatearFecha, formatearHora, hoyISO, escapeHtml, setLoading,
   hhmm12, toMin, rangoHora,
 } from "./utils.js";
 import { crearCalendarioMes, serieDeHoras } from "./calendario.js";
-import { llenarSelectSedes, chipSede, nombreSede, getSedes } from "./sedes.js";
+import { llenarSelectSedes, chipSede, nombreSede, getSedes, cargarSedes } from "./sedes.js";
 import { DURACION_CITA_MIN } from "./config.js";
 
 let realtimeChannel = null;
@@ -83,11 +83,30 @@ export async function entrarAlPanel() {
     el.classList.toggle("hidden", !esAdmin());
   });
 
+  configurarSelectoresDeSede();
+
+  showView("view-panel");
+  cambiarTab("citas");
+  await Promise.all([cargarCitas(), cargarHorarios()]);
+  activarRealtime();
+}
+
+// Deja los tres selectores de sede y la guía del trabajador acorde a quién está
+// dentro. Se llama al entrar y cada vez que cambian las sedes en la base, así que
+// CONSERVA lo que el usuario tenía elegido: si no, un alta de sede en otra
+// pestaña le reseteaba el filtro en la cara.
+function configurarSelectoresDeSede() {
   const mias = misSedesGestionadas();
   const cuantas = mias === null ? getSedes().length : mias.length;
   const unaSola = cuantas === 1;
 
   pintarGuiaTrabajador(mias);
+
+  const elegidos = {
+    citas: document.getElementById("filtro-sede-citas").value,
+    horarios: document.getElementById("filtro-sede-horarios").value,
+    alta: document.getElementById("nuevo-horario-sede").value,
+  };
 
   // CITAS: ahora SÍ se filtran por sede. Antes no, porque una cita delegada podía
   // ser de cualquier sede y el filtro se la escondía (el bug del punto 1 de
@@ -118,13 +137,17 @@ export async function entrarAlPanel() {
     el.classList.toggle("hidden", unaSola);
   });
 
+  // Se devuelve la elección anterior si esa sede sigue estando entre las opciones.
+  const restaurar = (id, valor) => {
+    const sel = document.getElementById(id);
+    if (valor && [...sel.options].some((o) => o.value === valor)) sel.value = valor;
+  };
+  restaurar("filtro-sede-citas", elegidos.citas);
+  restaurar("filtro-sede-horarios", elegidos.horarios);
+  restaurar("nuevo-horario-sede", elegidos.alta);
+
   // Refresca el recuento del alta con la sede que corresponda al rol.
   actualizarResumenAlta();
-
-  showView("view-panel");
-  cambiarTab("citas");
-  await Promise.all([cargarCitas(), cargarHorarios()]);
-  activarRealtime();
 }
 
 export function salirDelPanel() {
@@ -156,7 +179,7 @@ export async function cargarCitas() {
 
   let query = supabase
     .from("citas")
-    .select("id, nombre_cliente, telefono_cliente, email_cliente, sede_id, fecha, hora, estado")
+    .select("id, nombre_cliente, telefono_cliente, email_cliente, dni_cliente, sede_id, fecha, hora, estado")
     .order("fecha", { ascending: true })
     .order("hora", { ascending: true });
 
@@ -381,10 +404,17 @@ function renderCita(cita) {
   info.appendChild(cuando);
 
   const contacto = document.createElement("span");
-  contacto.textContent = cita.email_cliente
-    ? `${cita.telefono_cliente} · ${cita.email_cliente}`
-    : cita.telefono_cliente;
+  contacto.textContent = [cita.telefono_cliente, cita.email_cliente]
+    .filter(Boolean).join(" · ");
   info.appendChild(contacto);
+
+  // Las citas anteriores al 25/09/2026 no tienen DNI: la línea no se pinta en
+  // vez de mostrar un "DNI: —" que no aporta nada.
+  if (cita.dni_cliente) {
+    const dni = document.createElement("span");
+    dni.textContent = `DNI ${cita.dni_cliente}`;
+    info.appendChild(dni);
+  }
 
   // Chip de sede con su color: el trabajador puede tener todas las sedes.
   const chips = document.createElement("div");
@@ -1081,7 +1111,7 @@ async function alternarHorario(id, nuevoValor) {
   // adónde se fue.
   showToast(nuevoValor
     ? "Horario habilitado. Vuelve a «Libres»."
-    : "Horario deshabilitado. Pasa a «Reservados o deshabilitados».");
+    : "Horario deshabilitado. Pasa a «Inhabilitados».");
   cargarHorarios();
 }
 
@@ -1089,11 +1119,31 @@ async function alternarHorario(id, nuevoValor) {
 
 function activarRealtime() {
   if (realtimeChannel) return;
+
+  const recargarListas = () => {
+    cargarCitas();
+    cargarHorarios();
+  };
+
   realtimeChannel = supabase
-    .channel("panel-citas")
-    .on("postgres_changes", { event: "*", schema: "public", table: "citas" }, () => {
-      cargarCitas();
+    .channel("panel-en-vivo")
+    .on("postgres_changes", { event: "*", schema: "public", table: "citas" }, recargarListas)
+    .on("postgres_changes", { event: "*", schema: "public", table: "horarios_disponibles" }, () => {
       cargarHorarios();
+    })
+    // Una sede nueva (o un cambio de nombre o color) tiene que entrar sola: si no,
+    // quien tenga el panel abierto sigue sin verla hasta que recargue a mano.
+    .on("postgres_changes", { event: "*", schema: "public", table: "sedes" }, async () => {
+      await cargarSedes();
+      configurarSelectoresDeSede();
+      recargarListas();
+    })
+    // Y si el admin le cambia las sedes a un trabajador que está con el panel
+    // abierto, su pantalla se reacomoda sin que tenga que volver a entrar.
+    .on("postgres_changes", { event: "*", schema: "public", table: "perfil_sedes" }, async () => {
+      await recargarMisSedes();
+      configurarSelectoresDeSede();
+      recargarListas();
     })
     .subscribe();
 }

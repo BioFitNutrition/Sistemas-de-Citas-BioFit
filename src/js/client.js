@@ -12,7 +12,7 @@ import {
   setLoading, emailValido, pintarVariablesSede,
 } from "./utils.js";
 import { crearCalendarioMes } from "./calendario.js";
-import { getSedes, getSede, colorSede, mapaEmbedSede, mapsUrlSede } from "./sedes.js";
+import { getSedes, getSede, colorSede, mapaEmbedSede, mapsUrlSede, cargarSedes } from "./sedes.js";
 
 const state = {
   sedeId: null,
@@ -89,6 +89,31 @@ export function initClientFlow() {
   });
 
   document.getElementById("form-cita").addEventListener("submit", onSubmitCita);
+
+  escucharSedes();
+}
+
+// Las sedes en vivo también para el socio: si Luis abre una sede (o le cambia la
+// dirección o el mapa) mientras alguien tiene la página abierta, lo ve sin
+// recargar. Es lectura anónima, que es justo lo que RLS le permite.
+function escucharSedes() {
+  supabase
+    .channel("sedes-en-vivo")
+    .on("postgres_changes", { event: "*", schema: "public", table: "sedes" }, async () => {
+      await cargarSedes();
+      renderSedeGrid();
+      pintarSedesDePortada();
+      // Si estaba mirando una sede, se repintan su nombre, dirección y mapa.
+      // Ojo: NO se llama a seleccionarSede(), que cambia de vista y recarga los
+      // horarios; el socio podría estar a mitad del formulario.
+      if (state.sedeId) {
+        const sede = getSede(state.sedeId) || {};
+        document.getElementById("sede-nombre").textContent = sede.nombre || "";
+        document.getElementById("sede-ciudad").textContent = sede.direccion || "";
+        renderMapaSede(state.sedeId);
+      }
+    })
+    .subscribe();
 }
 
 // Prepara la pantalla de sedes según por dónde entró la persona. Al socio de
@@ -382,6 +407,15 @@ async function onSubmitCita(e) {
   const nombreCompleto = `${fd.get("nombre").trim()} ${fd.get("apellidos").trim()}`.trim();
   const telefono = fd.get("telefono").trim();
   const email = fd.get("email").trim();
+  const dni = fd.get("dni").trim();
+
+  // 8 dígitos exactos. La columna de la base es nullable a propósito (hay citas
+  // viejas sin DNI); la obligatoriedad se exige acá, no en la tabla.
+  if (!/^\d{8}$/.test(dni)) {
+    errorEl.textContent = "El DNI debe tener exactamente 8 números, sin puntos ni guiones.";
+    errorEl.classList.remove("hidden");
+    return;
+  }
 
   // El correo ahora es obligatorio: el socio recibe su confirmación por ahí.
   if (!emailValido(email)) {
@@ -401,6 +435,7 @@ async function onSubmitCita(e) {
     nombre_cliente: nombreCompleto,
     telefono_cliente: telefono,
     email_cliente: email,
+    dni_cliente: dni,
     fecha: horario.fecha,
     hora: horario.hora,
   });

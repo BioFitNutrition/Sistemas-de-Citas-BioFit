@@ -348,22 +348,16 @@ hizo. Comparar contra `cancelada_por` antes de mandar.
 
 ---
 
-## 🪪 14. Pedir DNI al agendar
+## ✅ 14. Pedir DNI al agendar — HECHO (25/09/2026)
 
-El formulario del socio hoy pide Nombre, Apellidos, Email y Teléfono. Agregar
-**DNI**.
-
-- Campo obligatorio
-- 8 dígitos, solo números. Validar en el frontend con mensaje claro
-- Mostrarlo en la tarjeta de la cita en el panel y en el correo de aviso interno
-
-⚠️ **Requiere migración:** columna `dni_cliente text` en `citas`.
-
-⚠️ **Nace nullable, no `not null`.** Ya hay citas creadas sin DNI; si la columna
-sale obligatoria de entrada, la migración falla o rompe los registros viejos. La
-obligatoriedad se aplica en el formulario, no en la tabla.
-
----
+> Campo **DNI** en el formulario del socio, obligatorio, 8 dígitos exactos
+> validados en el frontend con mensaje claro. Sale en la tarjeta de la cita del
+> panel y en el correo de aviso interno.
+>
+> Columna `citas.dni_cliente text` **nullable**, como estaba previsto: las 31
+> citas anteriores no tienen DNI y una columna `not null` habría roto la
+> migración. La obligatoriedad vive en el formulario, no en la tabla — por eso
+> la tarjeta del panel no pinta la línea del DNI cuando no hay.
 
 ## 🔗 15. Que el socio pueda cancelar su propia cita
 
