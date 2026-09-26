@@ -205,15 +205,12 @@ function renderSedeGrid() {
       // ni con el tabulador.
       btn.disabled = true;
 
+      // Va al principio y no al final: es una pestaña en la esquina, no una
+      // línea más de la tarjeta. Así todas miden lo mismo.
       const cinta = document.createElement("span");
       cinta.className = "sede-card__pronto";
-      cinta.textContent = "Próximamente…";
-      btn.appendChild(cinta);
-
-      const pista = document.createElement("small");
-      pista.className = "sede-card__pista";
-      pista.textContent = "Ya casi… estamos terminando de armar los horarios.";
-      btn.appendChild(pista);
+      cinta.textContent = "Próximamente";
+      btn.prepend(cinta);
 
       btn.setAttribute("aria-label",
         `${sede.nombre}. Próximamente: todavía no se puede reservar en esta sede.`);

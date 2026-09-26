@@ -19,16 +19,16 @@
 
 ## 🚨 Lo primero
 
-**1. La portada nueva está pequeña: 462×260.** Se va a ver estirada en pantallas
-grandes. Si tienes el original, mándalo: es el mismo nombre de archivo, no hay
-que tocar código. Detalle en el punto 6.
+**1. La portada sigue pequeña: 626×352.** Es más grande que la anterior, pero en
+un monitor todavía hay que estirarla 3 veces. Si tienes el original, mándalo:
+mismo nombre de archivo, no hay que tocar código. Detalle en el punto 6.
 
 **2. Haz una reserva de prueba con tu correo.** Comprueba de un tiro que el
 correo llega **bien formado** (hoy llegaba como texto crudo) y que el botón
 **"Cancelar mi cita"** funciona de punta a punta.
 
-**3. Lince ya no deja entrar.** Su tarjeta sale como **"Próximamente…"** y no se
-puede pulsar. Se desbloquea **sola** en cuanto le cargues el primer horario.
+**3. Lince ya no deja entrar.** Su tarjeta lleva una pestañita **"Próximamente"**
+y no se puede pulsar. Se desbloquea **sola** en cuanto le cargues el primer horario.
 
 ---
 
@@ -162,8 +162,11 @@ preparación también en el formulario y en la confirmación. Desapareció
 
 ### Una sede sin horarios ya no se puede pulsar
 
-Su tarjeta sale en gris, con borde punteado, la cinta **"Próximamente…"** latiendo
-suave y la línea *"Ya casi… estamos terminando de armar los horarios."*
+Su tarjeta sale en gris con una **pestañita "Próximamente"** en la esquina
+superior derecha, y nada más. La pestaña va **fuera del flujo** (posicionada
+sobre la tarjeta), así que la tarjeta conserva la misma estructura que las otras
+—nombre y dirección— y **todas miden exactamente igual**: la grilla usa
+`grid-auto-rows: 1fr`.
 
 - El botón va **`disabled` de verdad**, no apagado con CSS: tampoco entra con
   Enter ni con el tabulador
@@ -181,37 +184,51 @@ Hoy: Magdalena **82** horarios · Jesús María **283** · Lince **0**.
 
 ---
 
-## 6. 🖼️ La portada nueva (y su problema)
+## 6. 🖼️ La portada y el fondo
 
-Cambiada por la foto del local (máquinas, luces azules), con el mismo nombre de
-archivo, así que el CSS no se tocó. Recomprimida a calidad 85: **60 → 38 KB**.
+La foto cambió otra vez, y esta vez es **muy distinta**: ya no es el gimnasio
+oscuro y azulado, sino una toma **clara** (manzana, pesas y cinta métrica sobre
+mantel blanco). Se copió **tal cual, sin recomprimir**: ya venía en 24 KB, y
+volver a guardarla solo le habría quitado calidad. Es la máxima fidelidad
+posible al archivo que mandaste, y de paso la página bajó a **870 KB**.
 
-El velo bajó de **0,82 a 0,75**. En `styles.css`, en `body`, es **el único número
-que hay que mover**: bajarlo para que se note más, subirlo para que se note menos.
+### El velo tuvo que bajar bastante: de 0,75 a **0,60**
 
-### 🚨 Está pequeña: 462×260
+Con la foto anterior, oscura, el 0,75 funcionaba. Con esta, clara, el fondo
+quedaba en `rgb(240,241,237)` — **prácticamente el color de fondo liso: la foto
+no se veía**. Medido sobre la foto real:
 
-La anterior era **1100×733**. Al hacer `cover` en un monitor normal hay que
-estirarla 3-4 veces, así que **se verá borrosa en pantallas grandes**; en celular
-se nota mucho menos. **Si tienes el original en grande, mándalo.**
+| Velo | Fondo promedio | Texto normal | Pie de página |
+|---|---|---|---|
+| 0,75 | rgb(240,241,237) — invisible | 9,0:1 | 2,5:1 |
+| **0,60 (puesto)** | **rgb(235,237,230)** | **14,8:1 · peor caso 5,8:1** | **4,1:1** |
 
-### Nota de legibilidad, por si la quieres bajar más
+Ojo al dato bueno: el pie de página **mejoró** respecto a la foto oscura (era
+3,0:1, ahora 4,1:1 de promedio), porque esta foto es clara. En el peor caso
+—justo encima de una pesa— baja a 1,6:1, pero es una franja pequeña de la imagen.
 
-Esta foto es **oscura y azulada**, así que cada punto que se le quita al velo
-oscurece el fondo de toda la página. Medido sobre la foto real:
+**En `styles.css`, en `body::before`, el 0,60 es el único número que hay que
+mover**: bajarlo para que se note más, subirlo para que se note menos.
 
-| | Texto normal | Pie de página |
-|---|---|---|
-| Antes (Plaza Mayor, 0,82) | — | 3,6:1 |
-| **Ahora (0,75)** | **9,0:1 OK** | **3,0:1** |
+### El fondo ya no está en `body`, sino en una capa fija
 
-El texto normal está holgado y el contenido va sobre tarjetas blancas, así que
-**no se rompió nada**. El único flojo es el pie ("BioFit © 2026 — Asesoría
-nutricional"), que **ya estaba por debajo del estándar antes** de este cambio. No
-se tocó porque el diseño está aprobado por el cliente. Si quieres arreglarlo, es
-una línea: en `.footer`, cambiar `var(--color-text-muted)` por `#4b5563`.
+Pasó a `body::before` con `position: fixed`. Dos motivos: **cubre siempre el
+viewport exacto** (antes, en el móvil, el body crecía con el contenido y la foto
+se estiraba) y **no salta al hacer scroll**. Es `fixed` en el elemento, no
+`background-attachment: fixed`, que en iOS no funciona.
 
----
+- **En pantallas angostas la foto se ancla a la izquierda.** Los objetos están
+  arriba a la izquierda y el resto es mantel vacío: centrada, un celular
+  recortaba los lados y dejaba justo el vacío.
+- **En pantallas de 900px o más lleva un desenfoque de 2px.** La foto mide
+  626×352 y hay que estirarla 3 veces; el desenfoque la convierte en textura, y
+  se lee como decisión de diseño en vez de como una imagen reventada.
+
+### 🚨 Sigue estando pequeña: 626×352
+
+Es más grande que la anterior (462×260) pero sigue lejos de lo que pide un
+monitor. **Si tienes el original en grande, mándalo:** mismo nombre de archivo,
+no hay que tocar código, y ahí se borra el bloque del desenfoque.
 
 ## 7. Cómo se verificó
 
@@ -256,7 +273,8 @@ todo ASCII, encoded-word más largo **60** (límite 75), línea más larga **70*
 - **97 `getElementById` distintos comprobados contra los 121 ids del HTML: ninguno
   apunta a un elemento que no existe.** Es la prueba que atrapa lo que suele
   romperse al quitar botones, como los dos de la portada
-- Sin rastros de `esNuevo`, `btn-soy-cliente` ni `btn-soy-nuevo`
+- Sin rastros de `esNuevo`, `btn-soy-cliente`, `btn-soy-nuevo` ni de la línea
+  "Ya casi…" que se eliminó de la tarjeta
 
 🚨 **Sin probar todavía: el correo en Gmail de verdad, y las pantallas nuevas en un
 navegador** (cancelación, tarjeta de Lince, portada de un solo botón).
@@ -322,6 +340,13 @@ navegador** (cancelación, tarjeta de Lince, portada de un solo botón).
 19. **Nada de lo que ya funciona puede dejar de funcionar.**
 20. Flujo: `editar /src` → `python build.py` → `git add -A` → `git commit` → `git push`.
 21. **El color de la sede nunca se usa como texto sobre blanco.**
+21b. **El fondo vive en `body::before` con `position: fixed`, no en el `background`
+    del body.** Si vuelve al body, en el móvil se estira con el contenido.
+21c. **Las tarjetas de sede miden todas igual** (`grid-auto-rows: 1fr`), y lo que
+    distingue a una sede cerrada es una pestaña POSICIONADA, no una línea más de
+    texto. Añadir contenido al flujo de una tarjeta las vuelve a desparejar.
+21d. **Los tamaños van con `clamp()`, no con saltos de breakpoint**, para que la
+    página se acomode de forma continua al ancho.
 22. **El alta de horarios en lote usa `ignoreDuplicates: true`.**
 23. **Un horario con cualquier cita apuntándolo no se puede borrar**, aunque esté
     cancelada.

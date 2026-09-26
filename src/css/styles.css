@@ -26,22 +26,54 @@
 
 * { box-sizing: border-box; }
 
-/* La foto del local va debajo de una capa del color de fondo: se intuye el
-   gimnasio, no compite con nada. El 0.75 es EL ÚNICO valor que hay que mover
-   para que se note más (bajarlo) o menos (subirlo).
-   Ojo al bajarlo: esta foto es oscura y azulada, así que cada punto que se le
-   quita al velo oscurece el fondo de toda la página. */
 body {
   margin: 0;
   font-family: var(--font);
-  background:
-    linear-gradient(rgba(247, 248, 247, 0.75), rgba(247, 248, 247, 0.75)),
-    url("assets/portada-biofit.jpg") center / cover no-repeat;
   background-color: var(--color-bg);
   color: var(--color-text);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+}
+
+/* La portada, en una capa FIJA detrás de todo.
+   Va en un pseudo-elemento y no en el `background` del body por dos razones:
+   cubre siempre el viewport exacto (en el móvil el body crece con el contenido
+   y la foto se estiraba), y no salta al hacer scroll. Es `fixed` en el
+   elemento, no `background-attachment: fixed`, que en iOS no funciona.
+
+   El 0.60 del velo es EL ÚNICO valor que hay que mover: bajarlo para que la
+   foto se note más, subirlo para que se note menos. Esta foto es CLARA (brillo
+   medio 74/100), así que aguanta bastante menos velo que una oscura: por
+   encima de 0.75 desaparecía del todo. Medido con la foto real, a 0.60 el
+   texto sobre el fondo queda en 5.8:1, holgado. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(rgba(247, 248, 247, 0.60), rgba(247, 248, 247, 0.60)),
+    url("assets/portada-biofit.jpg") center / cover no-repeat;
+}
+
+/* La foto tiene los objetos (manzana, pesas, cinta) arriba a la IZQUIERDA y el
+   resto es mantel vacío. En una pantalla angosta, `cover` centrado recorta los
+   lados y deja justo el vacío: se anclan a la izquierda para que se vean. */
+@media (max-width: 700px) {
+  body::before { background-position: left center, left center; }
+}
+
+/* La foto original mide 626x352. En el celular se ve nítida, pero en un monitor
+   hay que estirarla 3 veces y se pixela. Un desenfoque mínimo la convierte en
+   una textura: se lee como decisión de diseño y no como una imagen reventada.
+   Si algún día llega la foto en grande, se borra este bloque entero.
+   El scale tapa el borde translúcido que deja el blur. */
+@media (min-width: 900px) {
+  body::before {
+    filter: blur(2px);
+    transform: scale(1.05);
+  }
 }
 
 .hidden { display: none !important; }
@@ -85,13 +117,15 @@ body {
   max-width: 640px;
   width: 100%;
   margin: 0 auto;
-  padding: 32px 20px 60px;
+  /* clamp en vez de un breakpoint: el margen se encoge de forma continua, asi
+     que no hay un ancho donde el contenido "salte". */
+  padding: clamp(18px, 5vw, 32px) clamp(14px, 4vw, 20px) 56px;
 }
 
 .view { animation: fadeIn 0.2s ease; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
-.hero { text-align: center; padding: 40px 0; }
+.hero { text-align: center; padding: clamp(20px, 6vw, 40px) 0; }
 .hero .kicker {
   color: var(--color-accent);
   text-transform: uppercase;
@@ -100,7 +134,7 @@ body {
   font-size: 0.8rem;
   margin: 0 0 10px;
 }
-.hero h1 { font-size: 1.8rem; margin-bottom: 8px; }
+.hero h1 { font-size: clamp(1.45rem, 5.5vw, 1.85rem); line-height: 1.25; margin-bottom: 8px; }
 .subtitle { color: var(--color-text-muted); margin-bottom: 32px; }
 
 /* ============================================
@@ -154,7 +188,12 @@ select:disabled { opacity: 0.55; cursor: not-allowed; box-shadow: none; }
 .btn-primary:hover { background: var(--color-primary-dark); }
 .btn-primary:active { transform: scale(0.98); }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-large { padding: 18px 36px; font-size: 1.1rem; border-radius: 999px; }
+.btn-large {
+  padding: 17px clamp(24px, 7vw, 36px);
+  font-size: clamp(1rem, 3.6vw, 1.1rem);
+  border-radius: 999px;
+  max-width: 100%;
+}
 .btn-block { width: 100%; }
 
 /* Estado de carga: spinner + texto atenuado */
@@ -206,7 +245,10 @@ select:disabled { opacity: 0.55; cursor: not-allowed; box-shadow: none; }
 /* Sede selector */
 .sede-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  /* Todas las tarjetas del mismo alto, tengan o no la pestaña o una dirección
+     más larga. Sin esto, cada fila se ajusta a su contenido y quedan desparejas. */
+  grid-auto-rows: 1fr;
   gap: 16px;
   margin-top: 20px;
 }
@@ -214,6 +256,8 @@ select:disabled { opacity: 0.55; cursor: not-allowed; box-shadow: none; }
   .sede-grid { grid-template-columns: 1fr; }
 }
 .sede-card {
+  position: relative;          /* ancla la pestaña de "Próximamente" */
+  overflow: hidden;            /* para que la pestaña respete la esquina redondeada */
   background: var(--color-surface);
   border: 2px solid var(--color-border);
   border-radius: var(--radius);
@@ -225,6 +269,8 @@ select:disabled { opacity: 0.55; cursor: not-allowed; box-shadow: none; }
   box-shadow: var(--shadow);
   transition: border-color 0.15s ease, transform 0.1s ease;
 }
+/* Nada dentro del layout puede empujar la pagina a lo ancho. */
+img, iframe, video { max-width: 100%; }
 .sede-card:hover { border-color: var(--color-primary); transform: translateY(-2px); }
 
 /* ============================================
@@ -844,6 +890,7 @@ select:disabled { opacity: 0.55; cursor: not-allowed; box-shadow: none; }
 .sede-card {
   display: flex;
   flex-direction: column;
+  justify-content: center;     /* con las filas al mismo alto, el texto va centrado */
   gap: 6px;
   border-left: 5px solid var(--sede-color, var(--color-border));
 }
@@ -852,10 +899,11 @@ select:disabled { opacity: 0.55; cursor: not-allowed; box-shadow: none; }
 .sede-card:hover { border-color: var(--color-primary); border-left-color: var(--sede-color, var(--color-primary)); }
 
 /* Sede anunciada pero sin agenda abierta. El botón va `disabled` de verdad, así
-   que esto es solo el aspecto: se ve que existe y que aún no se puede entrar. */
+   que esto es solo el aspecto. La tarjeta mantiene EXACTAMENTE la misma
+   estructura que las demás (nombre + dirección) para que todas midan igual: lo
+   único que se añade es una pestaña en la esquina, fuera del flujo. */
 .sede-card--pronto {
   cursor: default;
-  border-style: dashed;
   background: var(--color-neutral-light);
 }
 .sede-card--pronto:hover {
@@ -864,36 +912,21 @@ select:disabled { opacity: 0.55; cursor: not-allowed; box-shadow: none; }
   transform: none;
 }
 .sede-card--pronto .sede-card__nombre,
-.sede-card--pronto .sede-card__dir { opacity: 0.7; }
+.sede-card--pronto .sede-card__dir { opacity: 0.72; }
 
 .sede-card__pronto {
-  align-self: flex-start;
-  margin-top: 4px;
-  padding: 4px 12px;
-  border-radius: 999px;
-  background: rgba(136, 227, 0, 0.22);
-  color: var(--color-primary-dark);
-  font-size: 0.72rem;
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 4px 10px;
+  border-radius: 0 calc(var(--radius) - 3px) 0 10px;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 0.64rem;
   font-weight: 700;
-  letter-spacing: 0.09em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  animation: prontoLatido 2.4s ease-in-out infinite;
-}
-.sede-card__pista {
-  color: var(--color-text-muted);
-  font-weight: 500;
-  font-size: 0.8rem;
-  font-style: italic;
-}
-
-/* El latido es lo que le da el aire de "ya casi". Muy suave a propósito: es una
-   tarjeta que NO se puede tocar, no debe pedir clic. */
-@keyframes prontoLatido {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.55; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .sede-card__pronto { animation: none; }
+  line-height: 1.4;
 }
 
 /* Encabezado del calendario teñido con el color de la sede */
