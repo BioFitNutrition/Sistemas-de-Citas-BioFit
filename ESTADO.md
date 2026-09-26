@@ -256,7 +256,26 @@ notaba era el desenfoque.
 Lo que se hizo en su lugar: subir la imagen ya reescalada con **LANCZOS y una
 máscara de enfoque**, así el navegador no tiene que estirar casi nada y no hay que
 tapar nada. La del consultorio va a **1920×1278**, que es lo que pide `cover` en
-una pantalla de 1920 de ancho. Cuesta **156 KB** y deja la página en **1047 KB**.
+una pantalla de 1920 de ancho. Cuesta **242 KB** y deja la página en **1161 KB**.
+
+### Se veía "ficticia": era el procesado, no la foto
+
+La primera versión se veía artificial, de plástico. La culpa era mía, en tres
+puntos, y los tres están corregidos en la receta de abajo:
+
+1. **Enfoque al 110%.** Dejaba **halos** alrededor de la laptop y de las sillas.
+   Ese contorno marcado es lo que se lee como "ficticio". Ahora va al **55%**.
+2. **Un único salto de ampliación de 2,6×.** Ahora sube **por pasos del 15%**:
+   cada paso interpola poco y el resultado queda mucho más natural.
+3. **Submuestreo de color** (el de por defecto tira tres cuartos de la
+   información de color) y calidad 76. Ahora **4:4:4 y calidad 86**.
+
+Se añadió además un desenfoque mínimo (0,4) **antes** de ampliar: el original es
+un JPEG de 736 px y ya trae artefactos; ampliarlo tal cual los agranda junto con
+la foto.
+
+⚠️ **La receta exacta está en el commit `Mejora la calidad de la portada`. Si hay
+que regenerar la imagen, copiarla de ahí en vez de improvisar otra.**
 
 ⚠️ **Se reescala SIEMPRE desde el archivo original de Christopher**, nunca desde el
 que ya está en `src/assets/`: reescalar sobre un reescalado acumula pérdida.
