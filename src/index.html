@@ -35,14 +35,13 @@
       <h1>Agenda tu asesoría nutricional</h1>
       <p class="subtitle">Sesiones de 20 minutos en <span id="hero-sedes">nuestras sedes de Lima</span>.</p>
       <div class="hero__acciones">
-        <button id="btn-soy-cliente" class="btn-primary btn-large">SOY SOCIO</button>
-        <button id="btn-soy-nuevo" class="btn-primary btn-large">SOY NUEVO</button>
+        <button id="btn-agendar" class="btn-primary btn-large">Agendar mi asesoría</button>
       </div>
-      <p class="hero__pista">¿Primera vez en BioFit? Entra por <strong>SOY NUEVO</strong> y te decimos cómo prepararte para tu evaluación.</p>
+      <p class="hero__pista">Te tomará menos de un minuto. Antes de elegir tu hora te decimos cómo prepararte para la evaluación.</p>
     </div>
   </section>
 
-  <!-- ============ BIENVENIDA (Soy nuevo) ============ -->
+  <!-- ============ BIENVENIDA (requisitos, los ve todo el mundo) ============ -->
   <section id="view-bienvenida" class="view hidden">
     <button class="btn-back" data-back="home">
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
@@ -111,12 +110,12 @@
 
   <!-- ============ SELECCIÓN DE SEDE ============ -->
   <section id="view-sede" class="view hidden">
-    <button class="btn-back" id="btn-volver-sede" data-back="home">
+    <button class="btn-back" id="btn-volver-sede" data-back="bienvenida">
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       <span>Volver</span>
     </button>
-    <h2 id="sede-titulo">Elige tu sede</h2>
-    <p id="sede-ayuda" class="sede-ayuda hidden">Todas están dentro de un gimnasio XFLY. Elige la que te quede más cerca; después verás el mapa para llegar.</p>
+    <h2 id="sede-titulo">¿Qué sede te queda más cerca?</h2>
+    <p id="sede-ayuda" class="sede-ayuda">Todas están dentro de un gimnasio XFLY. Elige la que te quede más cerca; después verás el mapa para llegar.</p>
     <div id="sede-grid" class="sede-grid"></div>
   </section>
 
@@ -214,11 +213,11 @@
         <span class="gcal-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18M8 14h5"/></svg></span>
         Tu información de contacto
       </p>
-      <p id="booking-nuevo" class="aviso-nuevo hidden">
-        Es tu primera vez: con estos datos te enviamos la confirmación y te
-        reconocemos al llegar. Recuerda los requisitos de tu evaluación: ayunas
-        (o 2–3 horas después de comer), sin líquidos la hora previa, sin
-        ejercicio antes y con ropa deportiva.
+      <p id="booking-nuevo" class="aviso-nuevo">
+        Con estos datos te enviamos la confirmación y te reconocemos al llegar.
+        Recuerda los requisitos de tu evaluación: ayunas (o 2–3 horas después de
+        comer), sin líquidos la hora previa, sin ejercicio antes y con ropa
+        deportiva.
       </p>
       <form id="form-cita" class="form-stack">
         <label>Nombre
@@ -268,7 +267,7 @@
         <span><strong id="conf-sede"></strong><br><small id="conf-ciudad"></small></span>
       </p>
       <hr class="booking__hr" />
-      <p id="conf-nuevo" class="aviso-nuevo hidden">
+      <p id="conf-nuevo" class="aviso-nuevo">
         ¡Nos vemos pronto! Llega 5 minutos antes y pregunta por BioFit en la
         recepción del gimnasio. Para que tu evaluación salga precisa: ven en
         ayunas o 2–3 horas después de tu última comida, evita líquidos la hora

@@ -20,7 +20,7 @@ const state = {
   disponibilidad: {},          // { 'YYYY-MM-DD': [ { id, fecha, hora }, ... ] }
   refDia: null,                // primer día visible en las columnas de horarios
   diaSel: null,                // 'YYYY-MM-DD' del día resaltado
-  esNuevo: false,              // entró por "Soy nuevo": se le acompaña más
+  sedesConAgenda: null,        // Set de sedes con horarios; null = todavía no se sabe
 };
 
 let resizeTimer = null;
@@ -50,20 +50,16 @@ export function initClientFlow() {
   document.getElementById("booking-tz").textContent = ZONA_HORARIA;
   document.getElementById("conf-tz").textContent = ZONA_HORARIA;
 
-  // Dos entradas al mismo flujo. La diferencia es el acompañamiento, no el
-  // mecanismo: las dos terminan guardando la misma cita en la misma tabla.
-  document.getElementById("btn-soy-cliente").addEventListener("click", () => {
-    entrarAlFlujo(false);
-  });
-
-  document.getElementById("btn-soy-nuevo").addEventListener("click", () => {
-    state.esNuevo = true;
+  // Una sola entrada. Antes eran dos ("Soy socio" / "Soy nuevo") y la única
+  // diferencia era cuánto se acompañaba a la persona; el socio de siempre se
+  // saltaba los requisitos de la evaluación. Ahora los ve todo el mundo: quien
+  // ya vino no pierde nada por releerlos, y quien los necesitaba ya no depende
+  // de haber elegido bien el botón.
+  document.getElementById("btn-agendar").addEventListener("click", () => {
     showView("view-bienvenida");
   });
 
-  document.getElementById("btn-nuevo-elegir-sede").addEventListener("click", () => {
-    entrarAlFlujo(true);
-  });
+  document.getElementById("btn-nuevo-elegir-sede").addEventListener("click", entrarAlFlujo);
 
   document.querySelectorAll("[data-back]").forEach((btn) => {
     btn.addEventListener("click", () => showView("view-" + btn.dataset.back));
@@ -115,27 +111,30 @@ function escucharSedes() {
         renderMapaSede(state.sedeId);
       }
     })
+    // Y los horarios: en cuanto se carga el primero de una sede que estaba en
+    // "Próximamente", su tarjeta se desbloquea sola, sin recargar la página.
+    .on("postgres_changes", { event: "*", schema: "public", table: "horarios_disponibles" }, async () => {
+      state.sedesConAgenda = await cargarSedesConAgenda();
+      renderSedeGrid();
+      // Si estaba viendo el calendario de esa sede, se repinta su
+      // disponibilidad; si no, no hay nada que recargar.
+      if (state.sedeId && !state.horarioSeleccionado) {
+        await cargarDisponibilidad(state.sedeId);
+      }
+    })
     .subscribe();
 }
 
-// Prepara la pantalla de sedes según por dónde entró la persona. Al socio de
-// siempre se le va al grano; al nuevo se le explica dónde queda cada una.
-function entrarAlFlujo(esNuevo) {
-  state.esNuevo = esNuevo;
-
-  document.getElementById("sede-titulo").textContent = esNuevo
-    ? "¿Qué sede te queda más cerca?"
-    : "Elige tu sede";
-  document.getElementById("sede-ayuda").classList.toggle("hidden", !esNuevo);
-
-  // El "Volver" del nuevo regresa a la bienvenida, no a la portada.
-  const volver = document.getElementById("btn-volver-sede");
-  volver.dataset.back = esNuevo ? "bienvenida" : "home";
-
-  document.getElementById("booking-nuevo").classList.toggle("hidden", !esNuevo);
-  document.getElementById("conf-nuevo").classList.toggle("hidden", !esNuevo);
-
+// Prepara la pantalla de sedes. Todo el mundo entra por el mismo camino y ve
+// las mismas indicaciones.
+async function entrarAlFlujo() {
   showView("view-sede");
+
+  // Se vuelve a preguntar en cada entrada, no una sola vez al arrancar: entre
+  // que la persona abrió la página y llegó acá, pueden haberse cargado los
+  // horarios de una sede que estaba en "Próximamente".
+  state.sedesConAgenda = await cargarSedesConAgenda();
+  renderSedeGrid();
 }
 
 // "Magdalena del Mar, Jesús María y Lince" — armado desde la base. La portada
@@ -149,14 +148,42 @@ function pintarSedesDePortada() {
     : `${nombres.slice(0, -1).join(", ")} y ${nombres[nombres.length - 1]}`;
 }
 
+// Qué sedes ya tienen agenda abierta. Una sede anunciada pero sin NI UN horario
+// cargado no deja entrar: se muestra como "Próximamente".
+//
+// Se mira si tiene algún horario, sin filtrar por fecha ni por disponibilidad.
+// Así la sede se abre sola en cuanto alguien le carga el primero, sin tocar
+// código y sin nombrar ninguna sede acá (que sería mentira al abrir la próxima).
+//
+// Si la consulta falla se devuelve null, que significa "no sabemos", y entonces
+// NO se bloquea nada: es preferible dejar pasar y que el calendario avise, a
+// cerrarle la puerta a un socio por un problema de red.
+async function cargarSedesConAgenda() {
+  const { data, error } = await supabase
+    .from("horarios_disponibles")
+    .select("sede_id");
+
+  if (error) {
+    console.error("No se pudo saber qué sedes tienen agenda:", error);
+    return null;
+  }
+  return new Set((data || []).map((h) => h.sede_id));
+}
+
+function sedeAbierta(sedeId) {
+  return state.sedesConAgenda === null || state.sedesConAgenda.has(sedeId);
+}
+
 // Las sedes vienen de la base, con su color.
 function renderSedeGrid() {
   const grid = document.getElementById("sede-grid");
   grid.innerHTML = "";
 
   getSedes().forEach((sede) => {
+    const abierta = sedeAbierta(sede.id);
+
     const btn = document.createElement("button");
-    btn.className = "sede-card";
+    btn.className = abierta ? "sede-card" : "sede-card sede-card--pronto";
     btn.style.setProperty("--sede-color", sede.color || "");
 
     const nombre = document.createElement("span");
@@ -171,7 +198,27 @@ function renderSedeGrid() {
       btn.appendChild(dir);
     }
 
-    btn.addEventListener("click", () => seleccionarSede(sede.id));
+    if (abierta) {
+      btn.addEventListener("click", () => seleccionarSede(sede.id));
+    } else {
+      // disabled de verdad, no solo apagada con CSS: así tampoco entra con Enter
+      // ni con el tabulador.
+      btn.disabled = true;
+
+      const cinta = document.createElement("span");
+      cinta.className = "sede-card__pronto";
+      cinta.textContent = "Próximamente…";
+      btn.appendChild(cinta);
+
+      const pista = document.createElement("small");
+      pista.className = "sede-card__pista";
+      pista.textContent = "Ya casi… estamos terminando de armar los horarios.";
+      btn.appendChild(pista);
+
+      btn.setAttribute("aria-label",
+        `${sede.nombre}. Próximamente: todavía no se puede reservar en esta sede.`);
+    }
+
     grid.appendChild(btn);
   });
 }

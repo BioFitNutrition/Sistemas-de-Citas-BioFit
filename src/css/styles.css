@@ -26,13 +26,16 @@
 
 * { box-sizing: border-box; }
 
-/* La foto va debajo de una capa casi opaca del color de fondo: se intuye Lima,
-   no compite con nada. Si se sube la opacidad, el texto empieza a sufrir. */
+/* La foto del local va debajo de una capa del color de fondo: se intuye el
+   gimnasio, no compite con nada. El 0.75 es EL ÚNICO valor que hay que mover
+   para que se note más (bajarlo) o menos (subirlo).
+   Ojo al bajarlo: esta foto es oscura y azulada, así que cada punto que se le
+   quita al velo oscurece el fondo de toda la página. */
 body {
   margin: 0;
   font-family: var(--font);
   background:
-    linear-gradient(rgba(247, 248, 247, 0.82), rgba(247, 248, 247, 0.82)),
+    linear-gradient(rgba(247, 248, 247, 0.75), rgba(247, 248, 247, 0.75)),
     url("assets/portada-biofit.jpg") center / cover no-repeat;
   background-color: var(--color-bg);
   color: var(--color-text);
@@ -847,6 +850,51 @@ select:disabled { opacity: 0.55; cursor: not-allowed; box-shadow: none; }
 .sede-card__nombre { font-weight: 700; font-size: 1.05rem; }
 .sede-card__dir { color: var(--color-text-muted); font-weight: 500; font-size: 0.85rem; }
 .sede-card:hover { border-color: var(--color-primary); border-left-color: var(--sede-color, var(--color-primary)); }
+
+/* Sede anunciada pero sin agenda abierta. El botón va `disabled` de verdad, así
+   que esto es solo el aspecto: se ve que existe y que aún no se puede entrar. */
+.sede-card--pronto {
+  cursor: default;
+  border-style: dashed;
+  background: var(--color-neutral-light);
+}
+.sede-card--pronto:hover {
+  border-color: var(--color-border);
+  border-left-color: var(--sede-color, var(--color-border));
+  transform: none;
+}
+.sede-card--pronto .sede-card__nombre,
+.sede-card--pronto .sede-card__dir { opacity: 0.7; }
+
+.sede-card__pronto {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(136, 227, 0, 0.22);
+  color: var(--color-primary-dark);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  animation: prontoLatido 2.4s ease-in-out infinite;
+}
+.sede-card__pista {
+  color: var(--color-text-muted);
+  font-weight: 500;
+  font-size: 0.8rem;
+  font-style: italic;
+}
+
+/* El latido es lo que le da el aire de "ya casi". Muy suave a propósito: es una
+   tarjeta que NO se puede tocar, no debe pedir clic. */
+@keyframes prontoLatido {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sede-card__pronto { animation: none; }
+}
 
 /* Encabezado del calendario teñido con el color de la sede */
 .gcal-head { border-left: 4px solid var(--sede-color, transparent); padding-left: 12px; }
